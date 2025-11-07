@@ -1,0 +1,14 @@
+mcpServers:
+  docling:
+    command: docling-mcp-server
+    args: ["--transport", "streamable-http", "--host", "0.0.0.0", "--port", "3020"]
+    env:
+      DOC_CACHE_DIR: /data/cache
+
+  # Postman MCP (hosted HTTP endpoint - preferred)
+  postman:
+    command: npx
+    args: ["@postman/postman-mcp-server@latest", "--transport", "streamable-http", "--host", "0.0.0.0", "--port", "3021"]
+    env:
+      POSTMAN_API_KEY: ${POSTMAN_API_KEY}
+      POSTMAN_API_BASE_URL: ${POSTMAN_API_BASE_URL:-https://api.postman.com}

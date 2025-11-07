@@ -1,0 +1,99 @@
+openapi: 3.0.3
+info:
+  title: Hostinger Ops + Notifications + Health
+  version: 1.2.0
+servers:
+  - url: https://ops.example.com
+paths:
+  /deploy:
+    post:
+      summary: Deploy the UI to an environment
+      operationId: deployUi
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                environment: {type: string, enum: [staging, prod], default: staging}
+                commit: {type: string, default: main}
+                notify: {type: boolean, default: true}
+      responses: {"200": {description: Deployment started}}
+  /purge-cache:
+    post:
+      summary: Purge CDN/cache
+      operationId: purgeCache
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                scope: {type: string, enum: [all, assets, pages], default: assets}
+                environment: {type: string, enum: [staging, prod], default: staging}
+      responses: {"200": {description: Purge triggered}}
+  /notify/discord:
+    post:
+      summary: Send a message to Discord via webhook
+      operationId: notifyDiscord
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                webhook_url: {type: string}
+                content: {type: string, default: "Deploy completed ✅"}
+                username: {type: string, default: "pmoves-agent"}
+                embeds: {type: array, items: {type: object}}
+      responses: {"204": {description: Sent}}
+  /notify/slack:
+    post:
+      summary: Post a message to Slack channel using bot token
+      operationId: notifySlack
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                bot_token: {type: string}
+                channel: {type: string}
+                text: {type: string, default: "Deploy completed ✅"}
+                blocks: {type: array, items: {type: object}}
+      responses: {"200": {description: Slack API response}}
+  /notify/teams:
+    post:
+      summary: Send a message to Microsoft Teams via incoming webhook
+      operationId: notifyTeams
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                webhook_url: {type: string}
+                text: {type: string, default: "Deploy completed ✅"}
+      responses: {"200": {description: Delivered}}
+  /health/services:
+    post:
+      summary: Probe core pmoves services
+      operationId: healthServices
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                targets: {type: array, items: {type: object}}
+                timeout: {type: integer, default: 8}
+      responses: {"200": {description: Result statuses}}
+components:
+  securitySchemes: {apiKey: {type: apiKey, in: header, name: X-API-Key}}
+security: [{apiKey: []}]

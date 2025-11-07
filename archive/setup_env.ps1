@@ -1,0 +1,80 @@
+Param(
+  [switch]$Scan,
+  [string]$ScanDir = ".",
+  [string]$FromFile = ""
+)
+# setup_env.ps1 — create/merge a .env file for pmoves-mini (Windows)
+
+$Whitelist = @(
+  "SLACK_CHANNEL","DOCS_LOG_CHANNEL","SLACK_BOT_TOKEN","DISCORD_WEBHOOK_URL","TEAMS_WEBHOOK_URL",
+  "TS_AUTHKEY","HOSTINGER_API_KEY","HOSTINGER_PROJECT_ID","HOSTINGER_ENV",
+  "N8N_RUNNERS_AUTH_TOKEN",
+  "HIRAG_URL","MEILI_URL","MEILI_MASTER_KEY","QDRANT_URL","NEO4J_URL","NEO4J_USER","NEO4J_PASSWORD",
+  "MINIO_ENDPOINT","MINIO_ACCESS_KEY","MINIO_SECRET_KEY","MINIO_SECURE",
+  "PLAYWRIGHT_BASE_URL"
+)
+
+$envOut = ".env"
+$backupTs = Get-Date -Format "yyyyMMdd-HHmmss"
+
+function Merge-KV([string]$line) {
+  $parts = $line -split "=",2
+  if ($parts.Count -ne 2) { return }
+  $key = $parts[0]; $val = $parts[1].Trim('"').Trim("'")
+  $new = @()
+  if (Test-Path ".env.new") {
+    $found = $false
+    Get-Content ".env.new" | ForEach-Object {
+      if ($_ -match "^$key=") { $new += "$key=$val"; $found = $true } else { $new += $_ }
+    }
+    if (-not $found) { $new += "$key=$val" }
+  } else { $new = @("$key=$val") }
+  $new | Set-Content ".env.new" -Encoding UTF8
+}
+
+function Import-File([string]$path) {
+  if (-not (Test-Path $path)) { return }
+  Get-Content $path | ForEach-Object {
+    $line = $_
+    if ($line -match "^\s*#") { return }
+    $line = $line -replace "^\s*export\s+",""
+    $line = $line -replace "\s",""
+    if ($line -match "^[A-Za-z_][A-Za-z0-9_]*=.+$") {
+      $key = $line.Split("=")[0]
+      if ($Whitelist -contains $key) { Merge-KV $line }
+    }
+  }
+}
+
+function Scan-Dir([string]$dir) {
+  Get-ChildItem -Path $dir -Recurse -File -ErrorAction SilentlyContinue |
+    Where-Object { $_.Name -match "keys\.info|\.env$|\.env\.local$|\.env$|\.txt$" } |
+    ForEach-Object { Import-File $_.FullName }
+}
+
+function Prompt-Var([string]$key, [bool]$secret=$false) {
+  $current = ""
+  if (Test-Path ".env.new") {
+    $hit = Select-String -Path ".env.new" -Pattern "^$key=" -SimpleMatch -ErrorAction SilentlyContinue | Select-Object -First 1
+    if ($hit) { $current = ($hit.Line.Split("=",2)[1]) }
+  }
+  if ($current) { Write-Host "$key (Enter keeps current):" } else { Write-Host "$key:" }
+  if ($secret) { $val = Read-Host "> " -AsSecureString | ConvertFrom-SecureString -AsPlainText } else { $val = Read-Host "> " }
+  if ($val) { Merge-KV "$key=$val" }
+}
+
+if (Test-Path $envOut) { Copy-Item $envOut ".env.$backupTs.bak"; Copy-Item $envOut ".env.new" } else { New-Item ".env.new" -ItemType File | Out-Null }
+
+if ($FromFile) { Import-File $FromFile }
+if ($Scan) { Scan-Dir $ScanDir }
+
+if (-not $Scan -and -not $FromFile) {
+  Write-Host "Interactive mode — press Enter to keep current."
+  foreach ($k in "SLACK_CHANNEL","DOCS_LOG_CHANNEL","HOSTINGER_ENV","PLAYWRIGHT_BASE_URL","HIRAG_URL","MEILI_URL","QDRANT_URL","NEO4J_URL","MINIO_ENDPOINT","MINIO_SECURE") { Prompt-Var $k $false }
+  foreach ($k in "SLACK_BOT_TOKEN","DISCORD_WEBHOOK_URL","TEAMS_WEBHOOK_URL","TS_AUTHKEY","HOSTINGER_API_KEY","HOSTINGER_PROJECT_ID","N8N_RUNNERS_AUTH_TOKEN","MEILI_MASTER_KEY","NEO4J_USER","NEO4J_PASSWORD","MINIO_ACCESS_KEY","MINIO_SECRET_KEY") {
+    if ($k -eq "NEO4J_USER") { Prompt-Var $k $false } else { Prompt-Var $k $true }
+  }
+}
+
+Move-Item ".env.new" $envOut -Force
+Write-Host "Wrote $envOut (backup: .env.$backupTs.bak if existed)."

@@ -1,0 +1,18 @@
+{
+  "id": "pmoves-wm-vl-guard",
+  "title": "PMOVES • VL Guard",
+  "description": "Vision-Language monitoring and guardrails for workflow management.",
+  "whenToUse": [
+    "Monitoring visual outputs and screenshots",
+    "Content validation and safety checks",
+    "Automated quality assurance for visual content"
+  ],
+  "tools": [
+    "vl-sentinel:*"
+  ],
+  "instructions": [
+    "Use VL sentinel for visual analysis and monitoring.",
+    "Configure appropriate VL provider (Ollama/OpenAI).",
+    "Set up guardrails for content validation and safety."
+  ]
+}

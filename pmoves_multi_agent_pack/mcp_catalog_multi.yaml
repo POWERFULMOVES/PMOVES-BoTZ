@@ -1,0 +1,12 @@
+# MCP catalog for Docker MCP Gateway
+# - docling via local HTTP (container)
+# - postman via hosted HTTP (Authorization header)
+servers:
+  docling:
+    type: http
+    url: http://127.0.0.1:3020
+  postman:
+    type: http
+    url: https://mcp.postman.com/mcp
+    headers:
+      Authorization: "Bearer ${POSTMAN_API_KEY}"

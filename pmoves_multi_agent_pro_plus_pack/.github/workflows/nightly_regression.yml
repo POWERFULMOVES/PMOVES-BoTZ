@@ -1,0 +1,47 @@
+name: Nightly Doc vs API Regression
+
+on:
+  schedule:
+    - cron: "0 6 * * *"   # daily at 06:00 UTC
+  workflow_dispatch: {}
+
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    env:
+      POSTMAN_API_KEY: ${{ secrets.POSTMAN_API_KEY }}
+      POSTMAN_WORKSPACE_ID: ${{ secrets.POSTMAN_WORKSPACE_ID }}
+      SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node (for Newman)
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install tools deps
+        run: |
+          pip install -r tools/requirements.txt
+          npm i -g newman
+
+      - name: Generate Postman collection from OpenAPI
+        run: |
+          python tools/auto_collection_from_openapi.py specs/openapi.json "PMOVES Nightly" ||           python tools/auto_collection_from_openapi.py specs/openapi.yaml "PMOVES Nightly"
+
+      - name: Run Newman locally if out.collection.json exists
+        run: |
+          if [ -f out.collection.json ]; then
+            newman run out.collection.json --reporters cli,json --reporter-json-export newman_report.json || true
+          else
+            echo "Collection uploaded to Postman workspace; skipping local newman."
+          fi
+
+      - name: Summarize and notify Slack
+        run: |
+          python ci/report_to_slack.py

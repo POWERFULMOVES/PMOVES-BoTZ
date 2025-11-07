@@ -1,0 +1,16 @@
+version: "3.9"
+services:
+  mcp-gateway:
+    ports: ["2092:2091"]
+    environment:
+      ENVIRONMENT: "${ENVIRONMENT:-prod}"
+      SLACK_CHANNEL: "${SLACK_CHANNEL:-#cataclysm-deploys}"
+      DOCS_LOG_CHANNEL: "${DOCS_LOG_CHANNEL:-#cataclysm-deploys}"
+  crush-shim:
+    build: ./crush_shim
+    environment:
+      ENVIRONMENT: "${ENVIRONMENT:-prod}"
+      SLACK_CHANNEL: "${SLACK_CHANNEL:-#cataclysm-deploys}"
+      DOCS_LOG_CHANNEL: "${DOCS_LOG_CHANNEL:-#cataclysm-deploys}"
+    ports: ["7070:7069"]
+    restart: unless-stopped

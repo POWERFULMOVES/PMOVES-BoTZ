@@ -1,0 +1,8 @@
+{
+  "id": "pmoves-postman-mode",
+  "title": "PMOVES \u2022 Postman Executor",
+  "description": "Create collections, send requests, validate responses via Postman MCP.",
+  "tools": [
+    "postman:*"
+  ]
+}

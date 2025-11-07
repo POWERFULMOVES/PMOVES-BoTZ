@@ -1,0 +1,6 @@
+version: '3.9'
+
+services:
+  mcp-gateway:
+    volumes:
+      - ./features/mini/mcp_mini_portable.yaml:/app/mcp_catalog.yaml:ro

@@ -1,0 +1,52 @@
+openapi: 3.0.3
+info: {title: PMOVES E2B Runner, version: 1.0.0}
+servers: [{url: https://agent.example.com}]
+paths:
+  /sandbox/run:
+    post:
+      summary: Run code in a fresh E2B sandbox
+      operationId: runCode
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                code: {type: string}
+                language: {type: string, enum: [python, javascript, bash], default: python}
+                envs: {type: object}
+                timeout: {type: number, default: 120}
+                files: {type: object, additionalProperties: {type: string, description: "base64"}}
+                keep_alive: {type: boolean, default: false}
+                cwd: {type: string}
+      responses: {"200": {description: Result with stdout/stderr}}
+  /sandbox/exec:
+    post:
+      summary: Execute code in an existing sandbox
+      operationId: execCode
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                sandbox_id: {type: string}
+                code: {type: string}
+                language: {type: string, default: python}
+                timeout: {type: number, default: 120}
+      responses: {"200": {description: Result with stdout/stderr}}
+  /sandbox/stop:
+    post:
+      summary: Stop a sandbox
+      operationId: stopSandbox
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                sandbox_id: {type: string}
+      responses: {"200": {description: OK}}

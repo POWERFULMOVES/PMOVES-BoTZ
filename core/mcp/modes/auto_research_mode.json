@@ -1,0 +1,19 @@
+{
+  "id": "pmoves-auto-research-mode",
+  "title": "PMOVES • Auto Research",
+  "description": "Automated research and analysis using E2B sandbox and VL sentinel.",
+  "whenToUse": [
+    "Automated code execution and testing",
+    "Research tasks requiring sandboxed environments",
+    "Vision-language analysis of research materials"
+  ],
+  "tools": [
+    "e2b:*",
+    "vl-sentinel:*"
+  ],
+  "instructions": [
+    "Use E2B for safe code execution in isolated environments.",
+    "Leverage VL sentinel for visual analysis of research outputs.",
+    "Combine with docling for comprehensive research workflows."
+  ]
+}

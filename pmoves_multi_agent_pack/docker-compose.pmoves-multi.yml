@@ -1,0 +1,69 @@
+version: "3.9"
+
+x-env-files: &env_files
+  - ./env.shared
+  - ./.env
+  - ./.env.local
+
+services:
+  tailscale:
+    image: tailscale/tailscale:stable
+    hostname: pmoves-multi
+    environment:
+      - TS_AUTHKEY=${TS_AUTHKEY}
+      - TS_STATE_DIR=/var/lib/tailscale
+      - TS_USERSPACE=false
+      - TS_ACCEPT_DNS=true
+    cap_add: [ "NET_ADMIN", "NET_RAW" ]
+    volumes:
+      - ./ts-state:/var/lib/tailscale
+    network_mode: host
+    restart: unless-stopped
+    command: >
+      sh -lc "
+      tailscaled --state=/var/lib/tailscale/tailscaled.state &
+      sleep 2 &&
+      tailscale up --authkey=${TS_AUTHKEY} --reset --accept-routes=true --ssh=true &&
+      # Serve MCP gateway over HTTPS on your tailnet (maps / to 127.0.0.1:2091)
+      tailscale serve https / http://127.0.0.1:2091 &&
+      tail -f /dev/null
+      "
+
+  # Docker MCP Gateway to aggregate tools for ChatGPT Desktop
+  mcp-gateway:
+    image: alpine:3.20
+    working_dir: /app
+    entrypoint: ["/bin/sh","-lc"]
+    command: >
+      "
+      apk add --no-cache bash curl python3 py3-pip pipx docker-cli-plugins &&
+      pipx ensurepath &&
+      docker mcp gateway run --port 2091 --transport streaming --catalog /app/mcp_catalog_multi.yaml
+      "
+    env_file: *env_files
+    volumes:
+      - ./mcp_catalog_multi.yaml:/app/mcp_catalog_multi.yaml:ro
+    network_mode: host
+    restart: unless-stopped
+
+  # Docling MCP as standalone HTTP server
+  docling-mcp:
+    image: python:3.11-slim
+    working_dir: /srv
+    environment:
+      # optional: cache dir for big docs
+      DOC_CACHE_DIR: /data/cache
+    volumes:
+      - ./data/docling:/data
+    command: >
+      sh -lc "
+      pip install --no-cache-dir docling-mcp &&
+      docling-mcp-server --transport streamable-http --host 0.0.0.0 --port 3020
+      "
+    ports:
+      - "3020:3020"
+    restart: unless-stopped
+
+# NOTE:
+# - Postman MCP is best used via Postman's hosted HTTP endpoints (see README).
+#   You can also run their local STDIO server with Node or Docker (see DOCKER.md in their repo).

@@ -1,0 +1,58 @@
+version: '3.9'
+
+x-common-env: &common_env
+  - TS_AUTHKEY=${TS_AUTHKEY}
+  - TS_STATE_DIR=/var/lib/tailscale
+
+services:
+  tailscale:
+    image: tailscale/tailscale:stable
+    hostname: pmoves-core
+    environment: *common_env
+    cap_add: [ "NET_ADMIN", "NET_RAW" ]
+    volumes:
+      - ./core/ts-state:/var/lib/tailscale
+    network_mode: host
+    restart: unless-stopped
+    command: >
+      sh -lc "
+      tailscaled --state=/var/lib/tailscale/tailscaled.state &
+      sleep 2 &&
+      tailscale up --authkey=${TS_AUTHKEY} --reset --accept-routes=true --ssh=true &&
+      tailscale serve https / http://127.0.0.1:2091 &&
+      tail -f /dev/null
+      "
+
+  mcp-gateway:
+    image: alpine:3.20
+    working_dir: /app
+    environment:
+      - POSTMAN_API_KEY=${POSTMAN_API_KEY}
+    volumes:
+      - ./core/mcp_catalog.yaml:/app/mcp_catalog.yaml:ro
+    network_mode: host
+    restart: unless-stopped
+    command: >
+      "
+      apk add --no-cache bash curl python3 py3-pip pipx docker-cli-plugins &&
+      pipx ensurepath &&
+      docker mcp gateway run --port 2091 --transport streaming --catalog /app/mcp_catalog.yaml
+      "
+
+  # Docling MCP as standalone HTTP server
+  docling-mcp:
+    image: python:3.11-slim
+    working_dir: /srv
+    environment:
+      # optional: cache dir for big docs
+      DOC_CACHE_DIR: /data/cache
+    volumes:
+      - ./data/docling:/data
+    command: >
+      sh -lc "
+      pip install --no-cache-dir docling-mcp &&
+      docling-mcp-server --transport streamable-http --host 0.0.0.1 --port 3020
+      "
+    ports:
+      - "3020:3020"
+    restart: unless-stopped

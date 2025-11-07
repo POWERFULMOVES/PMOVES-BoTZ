@@ -1,0 +1,17 @@
+_display_name: Cataclysm Ops (pmoves-mini)
+features:
+  bot_user: {display_name: Cataclysm Ops, always_online: true}
+  slash_commands:
+    - {command: /deploy, url: https://ops.example.com/deploy, description: Deploy staging or prod, usage_hint: "[staging|prod] [commit]", should_escape: false}
+    - {command: /health, url: https://agent.example.com/health/services, description: Probe core services, should_escape: false}
+oauth_config:
+  scopes:
+    bot: [chat:write, commands, channels:read, groups:read, im:write, mpim:write]
+settings:
+  event_subscriptions:
+    request_url: https://agent.example.com/slack/events
+    bot_events: [app_mention]
+  interactivity: {is_enabled: false}
+  org_deploy_enabled: false
+  socket_mode_enabled: false
+  token_rotation_enabled: false

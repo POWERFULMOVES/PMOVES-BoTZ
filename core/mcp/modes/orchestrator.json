@@ -1,0 +1,15 @@
+{
+  "id": "pmoves-orchestrator",
+  "title": "PMOVES • Orchestrator",
+  "description": "Routes tasks between Docling and Postman modes.",
+  "routingRules": [
+    {
+      "if": "task mentions parsing docs or reading PDF/spec",
+      "mode": "pmoves-docling-mode"
+    },
+    {
+      "if": "task mentions sending API requests, collections, workspaces",
+      "mode": "pmoves-postman-mode"
+    }
+  ]
+}

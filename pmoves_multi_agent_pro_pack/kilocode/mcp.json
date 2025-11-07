@@ -1,0 +1,15 @@
+{
+  "servers": {
+    "docling": {
+      "type": "http",
+      "url": "http://localhost:3020"
+    },
+    "postman": {
+      "type": "http",
+      "url": "https://mcp.postman.com/mcp",
+      "headers": {
+        "Authorization": "Bearer ${POSTMAN_API_KEY}"
+      }
+    }
+  }
+}

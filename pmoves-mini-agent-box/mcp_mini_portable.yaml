@@ -1,0 +1,15 @@
+# mcp_mini_portable.yaml — pmoves-mini portable catalog
+servers:
+  docling:
+    type: process
+    command: ["python3"]
+    args: ["-m","pipx","run","--spec","docling-mcp==1.3.1","docling-mcp-server"]
+    restart: on_failure
+    env: {}
+x-templates:
+  portable_examples:
+    python_pipx_template:
+      type: process
+      command: ["python3"]
+      args: ["-m","pipx","run","--spec","package==X.Y.Z","package-mcp-server"]
+      restart: on_failure

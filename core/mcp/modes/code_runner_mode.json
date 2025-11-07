@@ -1,0 +1,18 @@
+{
+  "id": "pmoves-code-runner-mode",
+  "title": "PMOVES • Code Runner",
+  "description": "Execute code in secure E2B sandbox environments.",
+  "whenToUse": [
+    "Running code snippets or scripts",
+    "Testing code in isolated environments",
+    "Prototyping and experimentation"
+  ],
+  "tools": [
+    "e2b:*"
+  ],
+  "instructions": [
+    "Use E2B sandbox for secure code execution.",
+    "Specify appropriate runtime environments (Python, Node.js, etc.).",
+    "Handle dependencies and package installations as needed."
+  ]
+}
