@@ -83,6 +83,13 @@ docker compose -f docker-compose.mcp-pro.yml up -d e2b-runner vl-sentinel
 
 See `workflows/n8n/docling_postman_vl.json` for an illustrative HTTP-chain flow.
 
+## Troubleshooting Documentation
+
+For comprehensive troubleshooting procedures, see:
+- [Troubleshooting Guide](docs/TROUBLESHOOTING.md)
+- [Troubleshooting Scripts](docs/TROUBLESHOOTING_SCRIPTS.md)
+- [Quick Reference](docs/TROUBLESHOOTING_QUICK_REFERENCE.md)
+
 ## Development Status
 - **Last Updated**: November 2025
 - **Known Issues**: See REMEDIATION_PLAN.md for comprehensive issue analysis
