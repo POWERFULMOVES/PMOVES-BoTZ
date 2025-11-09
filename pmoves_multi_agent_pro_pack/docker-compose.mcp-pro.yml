@@ -1,5 +1,3 @@
-version: "3.9"
-
 x-env-files: &env_files
   - ./env.shared
   - ./.env
@@ -10,7 +8,7 @@ services:
     image: tailscale/tailscale:stable
     hostname: pmoves-pro
     environment:
-      - TS_AUTHKEY=${TS_AUTHKEY}
+      - TAILSCALE_AUTHKEY=${TAILSCALE_AUTHKEY}
       - TS_STATE_DIR=/var/lib/tailscale
       - TS_USERSPACE=false
       - TS_ACCEPT_DNS=true
@@ -19,46 +17,62 @@ services:
       - ./ts-state:/var/lib/tailscale
     network_mode: host
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "tailscale", "status"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
     command: >
       sh -lc "
       tailscaled --state=/var/lib/tailscale/tailscaled.state &
       sleep 2 &&
-      tailscale up --authkey=${TS_AUTHKEY} --reset --accept-routes=true --ssh=true &&
+      tailscale up --authkey=${TAILSCALE_AUTHKEY} --reset --accept-routes=true --ssh=true &&
       tailscale serve https / http://127.0.0.1:2091 &&
       tail -f /dev/null
       "
 
   mcp-gateway:
-    image: alpine:3.20
-    working_dir: /app
-    entrypoint: ["/bin/sh","-lc"]
-    command: >
-      "
-      apk add --no-cache bash curl python3 py3-pip pipx docker-cli-plugins &&
-      pipx ensurepath &&
-      docker mcp gateway run --port 2091 --transport streaming --catalog /app/mcp_catalog_multi.yaml
-      "
+    build: ./mcp_gateway
     env_file: *env_files
     volumes:
       - ./mcp_catalog_multi.yaml:/app/mcp_catalog_multi.yaml:ro
-    network_mode: host
+    ports:
+      - "2091:2091"
     restart: unless-stopped
+    depends_on:
+      docling-mcp:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:2091/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
 
-  # Docling MCP as standalone HTTP server (portable)
+  # Docling MCP as standalone HTTP server (using POWERFULMOVES/docling submodule)
   docling-mcp:
-    image: python:3.11-slim
+    build:
+      context: .
+      dockerfile: Dockerfile.docling-mcp
     working_dir: /srv
     environment:
       DOC_CACHE_DIR: /data/cache
     volumes:
       - ./data/docling:/data
+      - ./docling:/srv/docling  # Mount the submodule
     command: >
       sh -lc "
-      pip install --no-cache-dir docling-mcp &&
-      docling-mcp-server --transport streamable-http --host 0.0.0.0 --port 3020
+      python docling_mcp_server.py --transport http --host 0.0.0.0 --port 3020
       "
     ports: [ "3020:3020" ]
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-H", "Accept: text/event-stream", "-f", "http://localhost:3020/mcp"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
 
   # E2B sandbox runner shim (HTTP) — uses E2B Python SDK
   e2b-runner:
@@ -68,6 +82,12 @@ services:
       SANDBOX_TTL_SEC: ${SANDBOX_TTL_SEC:-1800}
     ports: [ "7071:7071" ]
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:7071/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
 
   # Vision-Language sentinel (guidance/monitoring) — pluggable provider
   vl-sentinel:
@@ -79,6 +99,33 @@ services:
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
     ports: [ "7072:7072" ]
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:7072/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  # Cipher Memory MCP server with Pmoves-cipher integration
+  cipher-memory:
+    build:
+      context: ./memory_shim
+      dockerfile: Dockerfile.cipher
+    environment:
+      VENICE_API_KEY: ${VENICE_API_KEY}
+      CIPHER_CONFIG_PATH: /app/memory_shim/pmoves_cipher/memAgent/cipher_pmoves.yml
+      PMOVES_ROOT: /app
+    volumes:
+      - ./memory_shim/pmoves_cipher:/app/memory_shim/pmoves_cipher:ro
+      - cipher_data:/data
+    ports: [ "8080:8080" ]
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
 
 # Optional: run Postman MCP locally (STDIO) in Node — prefer hosted HTTP.
 #  postman-mcp-local:
@@ -87,5 +134,14 @@ services:
 #    command: ["npx","@postman/postman-mcp-server@latest","--full"]
 #    environment:
 #      POSTMAN_API_KEY: ${POSTMAN_API_KEY}
-#    network_mode: host
+#    ports: [ "7073:7073" ]
 #    restart: unless-stopped
+#    healthcheck:
+#      test: ["CMD", "curl", "-f", "http://localhost:7073/health"]
+#      interval: 30s
+#      timeout: 10s
+#      retries: 3
+#      start_period: 10s
+
+volumes:
+  cipher_data:

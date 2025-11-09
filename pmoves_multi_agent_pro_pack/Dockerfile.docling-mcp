@@ -1,0 +1,40 @@
+# Dockerfile for POWERFULMOVES/docling MCP Server
+FROM python:3.11-slim-bullseye
+
+WORKDIR /srv
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy docling submodule first
+COPY docling/ ./docling/
+
+# Install docling from local submodule
+RUN pip install --no-cache-dir ./docling/
+
+# Copy MCP server after docling is installed
+COPY docling_mcp_server.py .
+
+# Verify the file was copied correctly
+RUN python -c "with open('/srv/docling_mcp_server.py', 'r') as f: content = f.read(); print('File contains create_initialization_options:' if 'create_initialization_options' in content else 'File contains initialize method')"
+
+# Copy and install MCP server requirements
+COPY docling_mcp_requirements.txt .
+RUN pip install --no-cache-dir -r docling_mcp_requirements.txt
+
+WORKDIR /srv
+
+# Create data directory
+RUN mkdir -p /data/cache
+
+# Expose port
+EXPOSE 3020
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
+    CMD curl -f -H "Accept: text/event-stream" http://localhost:3020/mcp || exit 1
+
+# Run the MCP server with HTTP transport
+CMD ["python", "docling_mcp_server.py", "--transport", "streamable-http", "--host", "0.0.0.0", "--port", "3020"]
