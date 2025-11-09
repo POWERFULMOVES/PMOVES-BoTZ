@@ -1,4 +1,4 @@
-# Dockerfile for POWERFULMOVES/docling MCP Server
+# Dockerfile for POWERFULMOVES/docling MCP Server with Configuration Support
 FROM python:3.11-slim-bullseye
 
 WORKDIR /srv
@@ -14,27 +14,43 @@ COPY docling/ ./docling/
 # Install docling from local submodule
 RUN pip install --no-cache-dir ./docling/
 
+# Copy configuration directory
+COPY config/ ./config/
+
 # Copy MCP server after docling is installed
 COPY docling_mcp_server.py .
 
 # Verify the file was copied correctly
-RUN python -c "with open('/srv/docling_mcp_server.py', 'r') as f: content = f.read(); print('File contains create_initialization_options:' if 'create_initialization_options' in content else 'File contains initialize method')"
+RUN python -c "with open('/srv/docling_mcp_server.py', 'r') as f: content = f.read(); print('File contains configuration support:' if 'Config' in content else 'File missing configuration support')"
 
 # Copy and install MCP server requirements
 COPY docling_mcp_requirements.txt .
 RUN pip install --no-cache-dir -r docling_mcp_requirements.txt
 
+# Install PyYAML for configuration support
+RUN pip install --no-cache-dir pyyaml
+
 WORKDIR /srv
 
-# Create data directory
+# Create data directory for cache
 RUN mkdir -p /data/cache
+
+# Create logs directory
+RUN mkdir -p /var/log
 
 # Expose port
 EXPOSE 3020
 
-# Health check
+# Health check using configuration
 HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
-    CMD curl -f -H "Accept: text/event-stream" http://localhost:3020/mcp || exit 1
+    CMD curl -f -H "Accept: text/event-stream" http://localhost:3020/health || exit 1
 
-# Run the MCP server with HTTP transport
-CMD ["python", "docling_mcp_server.py", "--transport", "streamable-http", "--host", "0.0.0.0", "--port", "3020"]
+# Default environment variables for configuration
+ENV DOCLING_MCP_SERVER__TRANSPORT=http \
+    DOCLING_MCP_SERVER__HOST=0.0.0.0 \
+    DOCLING_MCP_SERVER__PORT=3020 \
+    DOCLING_MCP_LOGGING__LEVEL=INFO \
+    DOCLING_MCP_DOCLING__CACHE_DIR=/data/cache
+
+# Run the MCP server with HTTP transport and configuration support
+CMD ["python", "docling_mcp_server.py", "--environment", "production"]

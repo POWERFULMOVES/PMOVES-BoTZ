@@ -57,22 +57,38 @@ services:
       dockerfile: Dockerfile.docling-mcp
     working_dir: /srv
     environment:
+      # Configuration via environment variables
+      DOCLING_MCP_SERVER__TRANSPORT: ${DOCLING_MCP_TRANSPORT:-http}
+      DOCLING_MCP_SERVER__HOST: ${DOCLING_MCP_HOST:-0.0.0.0}
+      DOCLING_MCP_SERVER__PORT: ${DOCLING_MCP_PORT:-3020}
+      DOCLING_MCP_LOGGING__LEVEL: ${DOCLING_MCP_LOG_LEVEL:-INFO}
+      DOCLING_MCP_DOCLING__CACHE_DIR: /data/cache
+      DOCLING_MCP_ENVIRONMENT: ${DOCLING_MCP_ENVIRONMENT:-production}
+      # Additional environment variables for customization
       DOC_CACHE_DIR: /data/cache
     volumes:
       - ./data/docling:/data
       - ./docling:/srv/docling  # Mount the submodule
-    command: >
-      sh -lc "
-      python docling_mcp_server.py --transport http --host 0.0.0.0 --port 3020
-      "
-    ports: [ "3020:3020" ]
+      - ./config:/srv/config:ro  # Mount configuration directory as read-only
+      - docling_logs:/var/log  # Mount logs directory
+    ports: 
+      - "3020:3020"
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-H", "Accept: text/event-stream", "-f", "http://localhost:3020/mcp"]
+      test: ["CMD", "curl", "-H", "Accept: text/event-stream", "-f", "http://localhost:3020/health"]
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 30s
+    command: >
+      sh -lc "
+      echo 'Starting Docling MCP Server with configuration support...' &&
+      echo 'Environment: ${DOCLING_MCP_ENVIRONMENT:-production}' &&
+      echo 'Transport: ${DOCLING_MCP_TRANSPORT:-http}' &&
+      echo 'Host: ${DOCLING_MCP_HOST:-0.0.0.0}' &&
+      echo 'Port: ${DOCLING_MCP_PORT:-3020}' &&
+      python docling_mcp_server.py --environment ${DOCLING_MCP_ENVIRONMENT:-production}
+      "
 
   # E2B sandbox runner shim (HTTP) — uses E2B Python SDK
   e2b-runner:
@@ -145,3 +161,4 @@ services:
 
 volumes:
   cipher_data:
+  docling_logs:
