@@ -1,0 +1,25 @@
+{
+  "id": "pmoves-cipher-memory-mode",
+  "title": "PMOVES • Cipher Memory",
+  "description": "Advanced memory management with Pmoves-cipher integration for persistent knowledge and reasoning patterns.",
+  "whenToUse": [
+    "Storing and retrieving coding knowledge across sessions",
+    "Managing multi-agent workflow context",
+    "Preserving reasoning patterns and decision history",
+    "Building project-specific knowledge bases",
+    "Cross-session learning and adaptation"
+  ],
+  "tools": [
+    "cipher-memory:*"
+  ],
+  "instructions": [
+    "Use cipher_store_memory to persist important knowledge, decisions, and context.",
+    "Search memory with cipher_search_memory to retrieve relevant past information.",
+    "Extract and organize knowledge using cipher_extract_and_operate_memory.",
+    "Store reasoning steps with cipher_store_reasoning_memory for future reference.",
+    "Search reasoning patterns with cipher_search_reasoning_patterns to find similar solutions.",
+    "Organize memories by agent type, project context, and workflow stage.",
+    "Use memory to maintain consistency across multi-agent workflows.",
+    "Leverage stored patterns to improve decision-making and problem-solving."
+  ]
+}
