@@ -9,7 +9,7 @@ After analyzing the `.env`, `env.shared`, and `docker-compose.mcp-pro.yml` files
 ### 1. OPENAI_API_KEY
 - **Status**: ✅ CONFIGURED
 - **Location**: `.env` line 29 and `.env.local` line 29
-- **Value**: `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`
+- **Value**: `sk-proj-[REDACTED-FOR-SECURITY]`
 - **Used by**: 
   - `cipher-memory` service (line 89 in docker-compose.mcp-pro.yml)
   - `vl-sentinel` service (line 79 in docker-compose.mcp-pro.yml)
@@ -18,20 +18,20 @@ After analyzing the `.env`, `env.shared`, and `docker-compose.mcp-pro.yml` files
 ### 2. VENICE_API_KEY
 - **Status**: ✅ CONFIGURED
 - **Location**: `.env` line 298 and `.env.local` line 298
-- **Value**: `No8lyD1zZZZ16IkCbvdyZ4wRTGtX_TbOjmFSkzs3Ni`
+- **Value**: `[REDACTED-FOR-SECURITY]`
 - **Note**: Not directly referenced in docker-compose.mcp-pro.yml but available in environment
 
 ### 3. TAILSCALE_AUTHKEY
 - **Status**: ✅ CONFIGURED & FIXED
 - **Location**: `.env` line 74 and `.env.local` line 74
-- **Value**: `tskey-auth-k7ASUQEjL411CNTRL-fnM2kcgCGAX6teUNZbxqAXKQP3JSKANH`
+- **Value**: `tskey-auth-[REDACTED-FOR-SECURITY]`
 - **Fix Applied**: Updated docker-compose.mcp-pro.yml to reference `TAILSCALE_AUTHKEY` instead of `TS_AUTHKEY`
 - **Used by**: `tailscale` service (lines 13 and 26 in docker-compose.mcp-pro.yml)
 
 ### 4. E2B_API_KEY
 - **Status**: ✅ CONFIGURED
 - **Location**: `.env` line 299 and `.env.local` line 299
-- **Value**: `b_c47434ed89e25e56ab4b58bbe80b6f1c23086bb9`
+- **Value**: `[REDACTED-FOR-SECURITY]`
 - **Used by**: `e2b-runner` service (line 67 in docker-compose.mcp-pro.yml)
 
 ### 5. PMOVES_ROOT
