@@ -11,6 +11,10 @@ import subprocess
 import requests
 import time
 from pathlib import Path
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
 
 class SmokeTester:
     def __init__(self):
@@ -109,6 +113,55 @@ class SmokeTester:
 
         return all_passed
 
+    def test_cipher_memory(self):
+        """Test Pmoves-cipher memory integration"""
+        tests = []
+        
+        # Check if cipher submodule exists
+        cipher_path = self.base_dir / 'pmoves_multi_agent_pro_pack' / 'memory_shim' / 'pmoves_cipher'
+        if cipher_path.exists():
+            tests.append(("Cipher Submodule", True, f"Found at {cipher_path}"))
+        else:
+            tests.append(("Cipher Submodule", False, "Not found - run git submodule update --init"))
+        
+        # Check if cipher is built
+        cipher_binary = cipher_path / 'dist' / 'src' / 'app' / 'index.cjs'
+        if cipher_binary.exists():
+            tests.append(("Cipher Build", True, "Cipher binary found"))
+        else:
+            tests.append(("Cipher Build", False, "Cipher not built - run setup script"))
+        
+        # Check API key for cipher (Venice.ai or OpenAI)
+        venice_key = os.getenv('VENICE_API_KEY')
+        openai_key = os.getenv('OPENAI_API_KEY')
+        
+        if venice_key and venice_key != 'test_key_placeholder' and len(venice_key) > 10:
+            tests.append(("OpenAI API", True, "Venice.ai API key format valid for cipher"))
+        elif openai_key and openai_key != 'test_key_placeholder' and openai_key.startswith('sk-'):
+            tests.append(("OpenAI API", True, "OpenAI API key format valid for cipher"))
+        else:
+            tests.append(("OpenAI API", False, "Missing or invalid API key for cipher (need VENICE_API_KEY or OPENAI_API_KEY)"))
+        
+        # Check cipher configuration
+        cipher_config = cipher_path / 'memAgent' / 'cipher.yml'
+        if cipher_config.exists():
+            tests.append(("Cipher Config", True, "PMOVES cipher configuration found"))
+        else:
+            tests.append(("Cipher Config", False, "Run cipher setup script"))
+        
+        # Test cipher memory server script
+        memory_script = self.base_dir / 'pmoves_multi_agent_pro_pack' / 'memory_shim' / 'app_cipher_memory.py'
+        if memory_script.exists():
+            tests.append(("Memory Server", True, "Cipher memory server script found"))
+        else:
+            tests.append(("Memory Server", False, "Memory server script missing"))
+        
+        for service, passed, msg in tests:
+            status = "PASS" if passed else "FAIL"
+            self.log(f"Cipher {service}: {msg}", status)
+        
+        return all(passed for _, passed, _ in tests)
+
     def test_api_connectivity(self):
         """Test external API connectivity"""
         tests = []
@@ -153,6 +206,7 @@ class SmokeTester:
         tests = [
             ("Environment Configuration", self.check_env_file),
             ("Pack Configurations", self.test_pack_configs),
+            ("Cipher Memory Integration", self.test_cipher_memory),
             ("API Connectivity", self.test_api_connectivity),
         ]
 

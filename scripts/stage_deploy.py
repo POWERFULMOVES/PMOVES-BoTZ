@@ -200,10 +200,10 @@ def main():
     success = deployer.run_deployment()
 
     if success:
-        print("\n✅ Staging deployment completed successfully!")
+        print("\n[SUCCESS] Staging deployment completed successfully!")
         print("Run 'python scripts/smoke_tests.py' to verify functionality")
     else:
-        print("\n❌ Staging deployment failed!")
+        print("\n[FAILED] Staging deployment failed!")
         sys.exit(1)
 
 if __name__ == '__main__':
