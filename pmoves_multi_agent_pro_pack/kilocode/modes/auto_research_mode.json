@@ -1,14 +1,24 @@
 {
   "id": "pmoves-auto-research",
-  "title": "PMOVES \u2022 Auto Researcher",
-  "description": "Plan \u2192 gather \u2192 synthesize. Uses Docling for docs, E2B for code, VL Sentinel for screenshots/figures.",
+  "title": "PMOVES • Auto Researcher",
+  "description": "Plan → gather → synthesize. Uses Docling for docs, E2B for code, VL Sentinel for screenshots/figures, Cipher Memory for persistent knowledge.",
   "whenToUse": [
-    "End-to-end tasks that combine reading docs, running code, and interpreting charts/figures."
+    "End-to-end tasks that combine reading docs, running code, and interpreting charts/figures.",
+    "Research tasks requiring persistent knowledge across sessions",
+    "Complex analysis requiring reasoning pattern storage"
+  ],
+  "tools": [
+    "docling:*",
+    "e2b:*",
+    "vl-sentinel:*",
+    "cipher-memory:*"
   ],
   "instructions": [
-    "1) Ask Docling to extract key sections/endpoints.",
-    "2) Stage code in E2B and run it with sample inputs.",
-    "3) Send plots/screenshots to VL Sentinel for sanity checks and suggestions.",
-    "4) Produce a final report (bulleted summary + artifacts list)."
+    "1) Search cipher memory for relevant past research and patterns.",
+    "2) Ask Docling to extract key sections/endpoints from new documents.",
+    "3) Stage code in E2B and run it with sample inputs.",
+    "4) Send plots/screenshots to VL Sentinel for sanity checks and suggestions.",
+    "5) Store research findings and reasoning patterns in cipher memory.",
+    "6) Produce a final report (bulleted summary + artifacts list)."
   ]
 }
