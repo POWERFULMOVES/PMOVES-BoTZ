@@ -1,0 +1,23 @@
+# Development configuration for Docling MCP Server
+# This file overrides default settings for development environment
+
+logging:
+  level: "DEBUG"  # More verbose logging for development
+
+performance:
+  tool_timeout: 60.0  # Longer timeout for development debugging
+  max_connections: 50  # Fewer connections for development
+
+security:
+  enable_cors: true
+  allowed_origins:
+    - "http://localhost:*"
+    - "https://localhost:*"
+    - "http://127.0.0.1:*"
+    - "https://127.0.0.1:*"
+  enable_rate_limiting: false  # Disable rate limiting in development
+
+docling:
+  enable_cache: true
+  cache_dir: "./data/cache"  # Local cache for development
+  max_file_size: 52428800  # 50MB for development

@@ -1,0 +1,103 @@
+# Default configuration for Docling MCP Server
+# This file contains all default values and serves as the base configuration
+
+server:
+  host: "0.0.0.0"
+  port: 3020
+  transport: "stdio"  # Options: stdio, http
+  name: "docling-mcp"
+
+logging:
+  level: "INFO"  # Options: DEBUG, INFO, WARNING, ERROR
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+  name: "docling-mcp"
+  output: "stdout"  # Options: stdout, stderr, or file path
+
+sse:
+  endpoint: "/mcp"
+  keepalive_interval: 0.1  # seconds
+  connection_timeout: 30.0  # seconds
+  max_queue_size: 1000
+  cors_origins:
+    - "*"
+  cors_methods:
+    - "GET"
+    - "OPTIONS"
+  cors_headers:
+    - "Content-Type"
+    - "Accept"
+    - "Cache-Control"
+  cors_max_age: 86400  # 24 hours
+
+performance:
+  tool_timeout: 30.0  # seconds
+  max_connections: 100
+  rate_limit_requests: 1000
+  rate_limit_window: 3600  # seconds
+
+security:
+  enable_cors: true
+  allowed_origins:
+    - "*"
+  enable_rate_limiting: false
+  max_request_size: 10485760  # 10MB
+
+docling:
+  cache_dir: "/data/cache"
+  enable_cache: true
+  max_file_size: 104857600  # 100MB
+  supported_formats:
+    - "pdf"
+    - "docx"
+    - "pptx"
+    - "xlsx"
+    - "html"
+    - "txt"
+    - "md"
+  pipeline_options: {}  # Additional Docling pipeline options
+
+health_check:
+  endpoint: "/health"
+  interval: 30  # seconds
+  timeout: 10  # seconds
+  retries: 3
+  start_period: 30  # seconds
+
+metrics:
+  enabled: true
+  collection_interval: 10.0  # seconds
+  retention_hours: 24
+  storage_backend: "memory"  # memory, file, database
+  storage_path: "/data/metrics"
+  prometheus_enabled: true
+  prometheus_port: 9090
+  prometheus_endpoint: "/metrics"
+  dashboard_enabled: true
+  dashboard_port: 8080
+  dashboard_endpoint: "/dashboard"
+  alerting_enabled: true
+  alert_thresholds:
+    cpu_usage_percent:
+      warning: 70.0
+      critical: 85.0
+    memory_usage_percent:
+      warning: 80.0
+      critical: 90.0
+    response_time_p95:
+      warning: 1000.0  # milliseconds
+      critical: 2000.0  # milliseconds
+    error_rate:
+      warning: 5.0  # percentage
+      critical: 10.0  # percentage
+    connection_errors:
+      warning: 10
+      critical: 50
+    tool_timeout_rate:
+      warning: 2.0  # percentage
+      critical: 5.0  # percentage
+  export_formats:
+    - "json"
+    - "csv"
+  export_interval: 300  # seconds (5 minutes)
+  compression_enabled: true
+  compression_threshold: 1000  # number of data points
