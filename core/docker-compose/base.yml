@@ -1,13 +1,13 @@
-version: '3.9'
 
 x-common-env: &common_env
-  - TS_AUTHKEY=${TS_AUTHKEY}
+  - TS_AUTHKEY=${TS_AUTHKEY:-${TAILSCALE_AUTHKEY}}
   - TS_STATE_DIR=/var/lib/tailscale
 
 services:
   tailscale:
     image: tailscale/tailscale:stable
     hostname: pmoves-core
+    profiles: ["linux"]
     environment: *common_env
     cap_add: [ "NET_ADMIN", "NET_RAW" ]
     volumes:
@@ -24,35 +24,66 @@ services:
       "
 
   mcp-gateway:
-    image: alpine:3.20
-    working_dir: /app
+    build: ../../pmoves_multi_agent_pro_pack/mcp_gateway/PMOVES-BotZ-gateway/mcp-proxy-server
     environment:
-      - POSTMAN_API_KEY=${POSTMAN_API_KEY}
+      MCP_CATALOG_PATH: /app/mcp_catalog.yaml
+      POSTMAN_API_KEY: ${POSTMAN_API_KEY}
     volumes:
-      - ./core/mcp_catalog.yaml:/app/mcp_catalog.yaml:ro
-    network_mode: host
-    restart: unless-stopped
-    command: >
-      "
-      apk add --no-cache bash curl python3 py3-pip pipx docker-cli-plugins &&
-      pipx ensurepath &&
-      docker mcp gateway run --port 2091 --transport streaming --catalog /app/mcp_catalog.yaml
-      "
-
-  # Docling MCP as standalone HTTP server
-  docling-mcp:
-    image: python:3.11-slim
-    working_dir: /srv
-    environment:
-      # optional: cache dir for big docs
-      DOC_CACHE_DIR: /data/cache
-    volumes:
-      - ./data/docling:/data
-    command: >
-      sh -lc "
-      pip install --no-cache-dir docling-mcp &&
-      docling-mcp-server --transport streamable-http --host 0.0.0.1 --port 3020
-      "
+      - ../mcp_catalog.yaml:/app/mcp_catalog.yaml:ro
     ports:
-      - "3020:3020"
+      - "${GATEWAY_PORT:-2091}:8000"
     restart: unless-stopped
+    labels:
+      pmoves.service: "gateway"
+      pmoves.health: "http://mcp-gateway:8000/ready"
+      pmoves.scrape: "http://mcp-gateway:8000/metrics"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/metrics"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+    networks:
+      default:
+        aliases: ["${PMZ_NAMESPACE:-pmoves-botz}_gateway", "mcp-gateway"]
+      pmoves_ai:
+        aliases: ["${PMZ_NAMESPACE:-pmoves-botz}_gateway", "mcp-gateway"]
+
+  # Docling MCP using PMOVES customized server (with /health and /metrics)
+  docling-mcp:
+    build:
+      context: ../../pmoves_multi_agent_pro_pack
+      dockerfile: Dockerfile.docling-mcp
+    environment:
+      DOCLING_MCP_SERVER__TRANSPORT: http
+      DOCLING_MCP_SERVER__HOST: 0.0.0.0
+      DOCLING_MCP_SERVER__PORT: 3020
+      DOCLING_MCP_LOGGING__LEVEL: INFO
+      DOCLING_MCP_DOCLING__CACHE_DIR: /data/cache
+    volumes:
+      - ../../pmoves_multi_agent_pro_pack/data/docling:/data
+    ports:
+      - "${DOCLING_PORT:-3020}:3020"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3020/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    labels:
+      pmoves.service: "docling"
+      pmoves.health: "http://docling-mcp:3020/health"
+      pmoves.scrape: "http://docling-mcp:3020/metrics"
+    networks:
+      default:
+        aliases: ["${PMZ_NAMESPACE:-pmoves-botz}_docling", "docling-mcp"]
+      pmoves_ai:
+        aliases: ["${PMZ_NAMESPACE:-pmoves-botz}_docling", "docling-mcp"]
+    
+
+networks:
+  default:
+    name: ${PMZ_NAMESPACE:-pmoves-botz}_net
+  pmoves_ai:
+    name: ${PMZ_NAMESPACE:-pmoves-botz}_ai
