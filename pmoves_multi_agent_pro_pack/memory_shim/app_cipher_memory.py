@@ -371,27 +371,45 @@ def start_cipher_ui_mode():
     env['CIPHER_MODE'] = 'ui'
     env['CIPHER_UI_PORT'] = env.get('CIPHER_UI_PORT', '3010')
     env['CIPHER_API_PORT'] = env.get('CIPHER_API_PORT', '3011')
+    ui_port = env['CIPHER_UI_PORT']
+    api_port = env['CIPHER_API_PORT']
     
     # Change to cipher directory
-    cipher_path = "/app/memory_shim/pmoves_cipher"
+    # Dockerfile.cipher copies pmoves_cipher/ to /app/pmoves_cipher. Use that root so
+    # Node can resolve dependencies from /app/pmoves_cipher/node_modules.
+    cipher_path = "/app/pmoves_cipher"
     
     print(f"Starting Cipher in UI mode on ports {env['CIPHER_UI_PORT']} (UI) and {env['CIPHER_API_PORT']} (API)")
     
     try:
+        # Check if cipher binary exists
+        cipher_binary = os.path.join(cipher_path, "dist", "src", "app", "index.cjs")
+        if not os.path.exists(cipher_binary):
+            print(f"Cipher binary not found at {cipher_binary}")
+            print("Building cipher first...")
+            build_result = subprocess.run(
+                ["pnpm", "run", "build"],
+                cwd=cipher_path,
+                capture_output=True,
+                text=True
+            )
+            if build_result.returncode != 0:
+                print(f"Failed to build cipher: {build_result.stderr}")
+                raise RuntimeError("Cipher build failed")
+            print("Cipher build completed successfully")
+        
         # Start cipher in UI mode using Popen to keep it running
         process = subprocess.Popen([
             "node",
-            "--preserve-symlinks",
-            "memory_shim/pmoves_cipher/dist/src/app/index.cjs",
+            cipher_binary,
             "--mode", "ui",
-            "--ui-port", env['CIPHER_UI_PORT'],
-            "--port", env['CIPHER_API_PORT'],
+            "--ui-port", str(ui_port),
+            "--port", str(api_port),
             "--host", "0.0.0.0",
-            "--agent", "memory_shim/pmoves_cipher/memAgent/cipher_pmoves.yml"
+            "--agent", "pmoves_cipher/memAgent/cipher_pmoves.yml"
         ],
-        cwd="/app",
-        env={**env, "NODE_PATH": "/app/memory_shim/pmoves_cipher/node_modules"},
-        env=env,
+        cwd="/app/pmoves_cipher",
+        env={**env, "NODE_PATH": "/app/pmoves_cipher/node_modules"},
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
         text=True,

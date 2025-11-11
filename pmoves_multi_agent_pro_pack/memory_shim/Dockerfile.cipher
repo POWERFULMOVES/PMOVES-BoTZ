@@ -23,8 +23,11 @@ COPY pmoves_cipher/ ./pmoves_cipher/
 # Build the JavaScript part
 WORKDIR /app/pmoves_cipher
 ENV CI=true
-RUN pnpm install --frozen-lockfile && \
-    pnpm run build
+RUN pnpm install --no-frozen-lockfile && \
+    pnpm add logform && \
+    pnpm run build && \
+    cp .env.example .env && \
+    cp .env.example dist/.env || true
 
 # Back to the main app directory
 WORKDIR /app
