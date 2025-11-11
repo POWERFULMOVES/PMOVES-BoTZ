@@ -9,6 +9,7 @@ import json
 import os
 import subprocess
 import sys
+import time
 from pathlib import Path
 from typing import Dict, List, Optional, Any
 import tempfile
@@ -360,5 +361,69 @@ async def main():
             server.server.create_initialization_options()
         )
 
+def start_cipher_ui_mode():
+    """Start cipher in UI mode with web interface"""
+    import subprocess
+    import os
+    
+    # Set environment variables for UI mode
+    env = os.environ.copy()
+    env['CIPHER_MODE'] = 'ui'
+    env['CIPHER_UI_PORT'] = env.get('CIPHER_UI_PORT', '3010')
+    env['CIPHER_API_PORT'] = env.get('CIPHER_API_PORT', '3011')
+    
+    # Change to cipher directory
+    cipher_path = "/app/memory_shim/pmoves_cipher"
+    
+    print(f"Starting Cipher in UI mode on ports {env['CIPHER_UI_PORT']} (UI) and {env['CIPHER_API_PORT']} (API)")
+    
+    try:
+        # Start cipher in UI mode using Popen to keep it running
+        process = subprocess.Popen([
+            "node",
+            "--preserve-symlinks",
+            "memory_shim/pmoves_cipher/dist/src/app/index.cjs",
+            "--mode", "ui",
+            "--ui-port", env['CIPHER_UI_PORT'],
+            "--port", env['CIPHER_API_PORT'],
+            "--host", "0.0.0.0",
+            "--agent", "memory_shim/pmoves_cipher/memAgent/cipher_pmoves.yml"
+        ],
+        cwd="/app",
+        env={**env, "NODE_PATH": "/app/memory_shim/pmoves_cipher/node_modules"},
+        env=env,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+        bufsize=1,
+        universal_newlines=True
+        )
+        
+        print("Cipher UI mode started successfully")
+        print(f"UI available at: http://localhost:{env['CIPHER_UI_PORT']}")
+        print(f"API available at: http://localhost:{env['CIPHER_API_PORT']}")
+        
+        # Monitor the process and output logs
+        try:
+            while True:
+                output = process.stdout.readline()
+                if output == '' and process.poll() is not None:
+                    break
+                if output:
+                    print(output.strip())
+        except KeyboardInterrupt:
+            print("Shutting down Cipher UI mode...")
+            process.terminate()
+            sys.exit(0)
+            
+    except Exception as e:
+        print(f"Error starting Cipher UI mode: {e}")
+        print("Falling back to MCP server mode...")
+        asyncio.run(main())
+
 if __name__ == "__main__":
-    asyncio.run(main())
+    # Check if we should start in UI mode
+    if os.environ.get('CIPHER_UI_MODE', 'false').lower() == 'true':
+        start_cipher_ui_mode()
+    else:
+        asyncio.run(main())

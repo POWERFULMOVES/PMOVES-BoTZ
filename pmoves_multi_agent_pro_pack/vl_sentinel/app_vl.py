@@ -10,7 +10,7 @@ DEFAULT_MODELS = {
 }
 _env_model = os.environ.get("VL_MODEL")
 MODEL = _env_model or DEFAULT_MODELS.get(PROVIDER, "qwen2.5-vl:14b")
-OLLAMA = os.environ.get("OLLAMA_BASE_URL","http://localhost:11434")
+OLLAMA = os.environ.get("OLLAMA_BASE_URL","http://host.docker.internal:11434")
 OPENAI_KEY = os.environ.get("OPENAI_API_KEY","")
 
 app = FastAPI(title="pmoves VL sentinel", version="1.0.0")
@@ -68,3 +68,8 @@ def vl_guide(body: GuideRequest):
     else:
         answer = ask_openai(prompt, img_b64s)
     return {"ok": True, "guidance": answer}
+
+@app.get("/health")
+def health_check():
+    """Health check endpoint for docker-compose health check"""
+    return {"status": "healthy", "provider": PROVIDER, "model": MODEL}

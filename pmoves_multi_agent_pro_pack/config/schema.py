@@ -4,7 +4,7 @@ Configuration schema for Docling MCP Server.
 This module defines the configuration schema and validation logic.
 """
 
-from typing import Dict, Any, Optional, List
+from typing import Dict, Any, Optional, List, Union
 from dataclasses import dataclass, field
 import enum
 

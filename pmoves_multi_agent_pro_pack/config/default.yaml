@@ -4,7 +4,7 @@
 server:
   host: "0.0.0.0"
   port: 3020
-  transport: "stdio"  # Options: stdio, http
+  transport: "http"  # Options: stdio, http
   name: "docling-mcp"
 
 logging:

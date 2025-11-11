@@ -1,14 +1,15 @@
-version: "3.9"
 services:
   # Local Postman MCP (STDIO) for environments without remote HTTP
   postman-mcp-local:
     image: node:20-alpine
     working_dir: /srv
     environment:
-      POSTMAN_API_KEY: ${POSTMAN_API_KEY}
+      POSTMAN_API_KEY: PMAK-690e5c6600414a0001f14674-3167c3686c5e852470b7a045287475b307
+      POSTMAN_API_BASE_URL: https://api.postman.com
     entrypoint: ["sh","-lc"]
     command: >
-      "npx @postman/postman-mcp-server@latest --full"
+      "sh -lc 'while true; do echo \"Starting Postman MCP server...\"; npx @postman/postman-mcp-server@latest --full || echo \"Postman MCP server exited, will restart in 30 seconds...\"; sleep 30; done'"
     # Note: STDIO runs inside the container; connect via a process-capable MCP client (e.g., Kilo Code 'process' config).
+    # Modified to keep container running even if server exits
     network_mode: host
     restart: unless-stopped

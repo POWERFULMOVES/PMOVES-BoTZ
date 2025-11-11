@@ -8,29 +8,27 @@ services:
     image: tailscale/tailscale:stable
     hostname: pmoves-pro
     environment:
-      - TAILSCALE_AUTHKEY=${TAILSCALE_AUTHKEY}
+      - TAILSCALE_AUTHKEY=${TS_AUTHKEY}
       - TS_STATE_DIR=/var/lib/tailscale
-      - TS_USERSPACE=false
+      - TS_USERSPACE=true
       - TS_ACCEPT_DNS=true
-    cap_add: [ "NET_ADMIN", "NET_RAW" ]
+      - TS_SOCKET_DIR=/var/run/tailscale
     volumes:
       - ./ts-state:/var/lib/tailscale
-    network_mode: host
+      - ./tailscale_final.sh:/tailscale_final.sh:ro
+    command: ["/bin/sh", "/tailscale_final.sh"]
+    cap_add:
+      - NET_ADMIN
+      - SYS_MODULE
+    devices:
+      - /dev/net/tun:/dev/net/tun
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "tailscale", "status"]
+      test: ["CMD", "sh", "-c", "tailscale status || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 10s
-    command: >
-      sh -lc "
-      tailscaled --state=/var/lib/tailscale/tailscaled.state &
-      sleep 2 &&
-      tailscale up --authkey=${TAILSCALE_AUTHKEY} --reset --accept-routes=true --ssh=true &&
-      tailscale serve https / http://127.0.0.1:2091 &&
-      tail -f /dev/null
-      "
+      start_period: 30s
 
   mcp-gateway:
     build: ./mcp_gateway
@@ -68,14 +66,14 @@ services:
       DOC_CACHE_DIR: /data/cache
     volumes:
       - ./data/docling:/data
-      - ./docling:/srv/docling  # Mount the submodule
+      - ./docling:/srv/docling  # Mount submodule
       - ./config:/srv/config:ro  # Mount configuration directory as read-only
       - docling_logs:/var/log  # Mount logs directory
     ports: 
       - "3020:3020"
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-H", "Accept: text/event-stream", "-f", "http://localhost:3020/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:3020/health"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -131,13 +129,18 @@ services:
       VENICE_API_KEY: ${VENICE_API_KEY}
       CIPHER_CONFIG_PATH: /app/memory_shim/pmoves_cipher/memAgent/cipher_pmoves.yml
       PMOVES_ROOT: /app
+      CIPHER_UI_PORT: 3010
+      CIPHER_API_PORT: 3011
+      CIPHER_UI_MODE: "true"
     volumes:
       - ./memory_shim/pmoves_cipher:/app/memory_shim/pmoves_cipher:ro
       - cipher_data:/data
-    ports: [ "8080:8080" ]
+    ports:
+      - "3010:3010"  # Web UI port
+      - "3011:3011"  # API port
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:3011/health"]
       interval: 30s
       timeout: 10s
       retries: 3

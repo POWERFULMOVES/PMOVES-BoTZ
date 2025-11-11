@@ -1,7 +1,0 @@
-{"logtail":{"client_time":"2025-11-08T21:05:35.802013372Z","proc_id":1424479284,"proc_seq":9},"text":"wgengine.NewUserspaceEngine(tun \"tailscale0\") ...\n"}
-{"logtail":{"client_time":"2025-11-08T21:05:35.803320503Z","proc_id":1424479284,"proc_seq":10},"text":"Linux kernel version: 6.6.87.2-microsoft-standard-WSL2\n"}
-{"logtail":{"client_time":"2025-11-08T21:05:35.804221583Z","proc_id":1424479284,"proc_seq":11},"text":"is CONFIG_TUN enabled in your kernel? `modprobe tun` failed with: modprobe: can't change directory to '/lib/modules': No such file or directory\n"}
-{"logtail":{"client_time":"2025-11-08T21:05:35.804452253Z","proc_id":1424479284,"proc_seq":12},"text":"wgengine.NewUserspaceEngine(tun \"tailscale0\") error: tstun.New(\"tailscale0\"): CreateTUN(\"tailscale0\") failed; /dev/net/tun does not exist\n"}
-{"logtail":{"client_time":"2025-11-08T21:05:35.804798457Z","proc_id":1424479284,"proc_seq":13},"text":"flushing log.\n"}
-{"logtail":{"client_time":"2025-11-08T21:05:35.804997976Z","proc_id":1424479284,"proc_seq":14},"text":"logger closing down\n"}
-{"logtail":{"client_time":"2025-11-08T21:05:35.805229411Z","proc_id":1424479284,"proc_seq":15},"text":"getLocalBackend error: createEngine: tstun.New(\"tailscale0\"): CreateTUN(\"tailscale0\") failed; /dev/net/tun does not exist\n"}

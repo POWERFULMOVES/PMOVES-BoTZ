@@ -1,0 +1,92 @@
+{
+  "mcpServers": {
+    "docling-mcp": {
+      "command": "node",
+      "args": ["build/index.js"],
+      "transport": "http",
+      "url": "http://localhost:3020",
+      "description": "Docling MCP Server for document processing and analytics"
+    },
+    "analytics-dashboard": {
+      "command": "node",
+      "args": ["build/index.js"],
+      "transport": "http",
+      "url": "http://localhost:8080",
+      "description": "Analytics Dashboard MCP Server for monitoring and metrics"
+    }
+  },
+  "modes": {
+    "analytics_dashboard_mode": {
+      "name": "Analytics Dashboard Mode",
+      "description": "Mode for working with the analytics dashboard and monitoring system",
+      "mcpServers": ["docling-mcp", "analytics-dashboard"],
+      "tools": [
+        {
+          "name": "convert_document",
+          "description": "Convert a document to structured format using Docling",
+          "server": "docling-mcp"
+        },
+        {
+          "name": "process_documents_batch",
+          "description": "Process multiple documents in batch using Docling",
+          "server": "docling-mcp"
+        },
+        {
+          "name": "health_check",
+          "description": "Check system health status",
+          "server": "docling-mcp"
+        },
+        {
+          "name": "get_analytics_metrics",
+          "description": "Get real-time analytics metrics from the dashboard",
+          "server": "analytics-dashboard"
+        },
+        {
+          "name": "get_memory_stats",
+          "description": "Get memory usage statistics",
+          "server": "analytics-dashboard"
+        },
+        {
+          "name": "get_knowledge_gaps",
+          "description": "Get knowledge gap analysis results",
+          "server": "analytics-dashboard"
+        },
+        {
+          "name": "get_effectiveness_scores",
+          "description": "Get effectiveness scoring metrics",
+          "server": "analytics-dashboard"
+        }
+      ],
+      "templates": [
+        {
+          "name": "Analytics Dashboard Integration",
+          "description": "Template for integrating with the analytics dashboard",
+          "content": "Use the analytics dashboard to monitor system performance, track knowledge gaps, and analyze effectiveness metrics. The dashboard provides real-time insights into memory usage, processing efficiency, and system health."
+        },
+        {
+          "name": "Document Processing Workflow",
+          "description": "Template for document processing with analytics",
+          "content": "Process documents using Docling MCP and monitor the analytics dashboard for performance metrics. Track processing times, memory usage, and effectiveness scores."
+        }
+      ]
+    }
+  },
+  "analyticsDashboard": {
+    "enabled": true,
+    "url": "http://localhost:8080",
+    "features": {
+      "memoryUsageVisualization": true,
+      "knowledgeGapAnalysis": true,
+      "effectivenessScoring": true,
+      "trendAnalysis": true,
+      "realTimeUpdates": true,
+      "exportFunctionality": true,
+      "healthIndicators": true,
+      "multiTabInterface": true,
+      "responsiveDesign": true
+    },
+    "refreshInterval": 5000,
+    "autoRefresh": true,
+    "exportFormats": ["json", "csv", "pdf"]
+  }
+}

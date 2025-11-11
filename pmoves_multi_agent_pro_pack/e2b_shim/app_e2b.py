@@ -1,7 +1,7 @@
 import os, time, typing, base64, json
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
-from e2b_code_interpreter import Sandbox
+from e2b import Sandbox
 
 E2B_API_KEY = os.environ.get("E2B_API_KEY","")
 if not E2B_API_KEY:
@@ -10,6 +10,11 @@ if not E2B_API_KEY:
 # E2B SDK reads the key from env automatically
 
 app = FastAPI(title="pmoves E2B sandbox runner", version="1.0.0")
+
+@app.get("/health")
+def health_check():
+    """Health check endpoint for docker health checks"""
+    return {"status": "healthy", "service": "e2b-runner"}
 
 class RunBody(BaseModel):
     code: str

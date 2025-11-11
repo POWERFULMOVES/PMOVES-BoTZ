@@ -24,7 +24,7 @@ COPY pmoves_cipher/ ./pmoves_cipher/
 WORKDIR /app/pmoves_cipher
 ENV CI=true
 RUN pnpm install --frozen-lockfile && \
-    pnpm run build:no-ui
+    pnpm run build
 
 # Back to the main app directory
 WORKDIR /app
@@ -50,8 +50,7 @@ ENV VENICE_API_KEY=${VENICE_API_KEY}
 ENV CIPHER_CONFIG_PATH=/app/pmoves_cipher/memAgent/cipher_pmoves.yml
 ENV PMOVES_ROOT=/app
 
-# Expose port for MCP server
-EXPOSE 3025
+# No port exposure needed for stdio transport
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \

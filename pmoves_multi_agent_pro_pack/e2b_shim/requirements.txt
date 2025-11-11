@@ -1,4 +1,4 @@
 fastapi==0.115.0
 uvicorn==0.30.6
-e2b-code-interpreter==2.3.0
+e2b==2.3.0
 pydantic==2.9.2

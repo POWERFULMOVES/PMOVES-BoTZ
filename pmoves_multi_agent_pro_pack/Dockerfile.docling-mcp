@@ -53,4 +53,4 @@ ENV DOCLING_MCP_SERVER__TRANSPORT=http \
     DOCLING_MCP_DOCLING__CACHE_DIR=/data/cache
 
 # Run the MCP server with HTTP transport and configuration support
-CMD ["python", "docling_mcp_server.py", "--environment", "production"]
+CMD ["python", "docling_mcp_server.py"]

@@ -30,7 +30,7 @@ def main():
     
     # Start the actual mcp-gateway service
     try:
-        cmd = ['mcp-gateway', '--catalog', catalog_path, '--port', '2091']
+        cmd = ['/app/venv/bin/python', '/app/gateway.py']
         logger.info(f"Running command: {' '.join(cmd)}")
         
         # Set up signal handlers for graceful shutdown

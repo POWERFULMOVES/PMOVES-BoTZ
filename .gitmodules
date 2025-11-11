@@ -4,3 +4,6 @@
 [submodule "pmoves_multi_agent_pro_pack/docling"]
 	path = pmoves_multi_agent_pro_pack/docling
 	url = https://github.com/POWERFULMOVES/docling.git
+[submodule "pmoves_multi_agent_pro_pack/mcp_gateway/PMOVES-BotZ-gateway"]
+	path = pmoves_multi_agent_pro_pack/mcp_gateway/PMOVES-BotZ-gateway
+	url = https://github.com/POWERFULMOVES/PMOVES-BotZ-gateway.git

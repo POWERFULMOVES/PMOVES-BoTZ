@@ -11,8 +11,10 @@ import json
 import logging
 import os
 import sys
+import time
 import traceback
 import argparse
+from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Union, Callable, Awaitable, TypeVar, Generic
 from typing_extensions import TypedDict, Protocol
@@ -58,22 +60,143 @@ except ImportError as e:
     print(f"Warning: Metrics system not available: {e}")
     METRICS_AVAILABLE = False
 
-# Docling imports
-try:
-    from docling.document_converter import DocumentConverter
-    from docling.datamodel.base_models import InputFormat
-    from docling.datamodel.pipeline_options import PipelineOptions
-    from docling.datamodel.settings import settings
-    DOCLING_AVAILABLE = True
-except ImportError as e:
-    print(f"Docling not available: {e}")
-    DOCLING_AVAILABLE = False
+# Docling imports with enhanced error handling and lazy loading
+class DoclingImports:
+    """
+    Manages Docling imports with lazy loading and comprehensive error handling.
+    Implements singleton pattern for efficient resource management.
+    """
+    
+    _instance = None
+    _initialized = False
+    
+    def __new__(cls):
+        if cls._instance is None:
+            cls._instance = super().__new__(cls)
+        return cls._instance
+    
+    def __init__(self):
+        if not self._initialized:
+            self._import_modules()
+            DoclingImports._initialized = True
+    
+    def _import_modules(self):
+        """Import Docling modules with comprehensive error handling and fallbacks."""
+        self.DocumentConverter = None
+        self.InputFormat = None
+        self.PipelineOptions = None
+        self.settings = None
+        self.version = None
+        self.available_features = set()
+        self.import_errors = []
+        
+        # Declare global variable at the beginning of the method
+        global DOCLING_AVAILABLE
+        
+        try:
+            # Primary import with detailed error tracking
+            import docling
+            self.version = getattr(docling, '__version__', 'unknown')
+            
+            # Core converter import
+            try:
+                from docling.document_converter import DocumentConverter
+                self.DocumentConverter = DocumentConverter
+                self.available_features.add('converter')
+            except ImportError as e:
+                self.import_errors.append(f"DocumentConverter import failed: {e}")
+            
+            # Optional imports with feature detection
+            optional_imports = {
+                'InputFormat': 'docling.datamodel.base_models',
+                'PipelineOptions': 'docling.datamodel.pipeline_options',
+                'settings': 'docling.datamodel.settings',
+                # Additional optional modules for future extensibility
+                'Document': 'docling.datamodel.document_models',
+                'Page': 'docling.datamodel.base_models',
+                'Table': 'docling.datamodel.base_models'
+            }
+            
+            for attr_name, module_path in optional_imports.items():
+                try:
+                    module = __import__(module_path, fromlist=[attr_name])
+                    if hasattr(module, attr_name):
+                        setattr(self, attr_name, getattr(module, attr_name))
+                        self.available_features.add(attr_name.lower())
+                except ImportError:
+                    # Silently handle optional imports
+                    pass
+                except AttributeError:
+                    # Module exists but attribute doesn't
+                    pass
+            
+            # Set global availability flag
+            DOCLING_AVAILABLE = self.DocumentConverter is not None
+            
+            # Use print for logging since logger might not be available yet
+            if DOCLING_AVAILABLE:
+                print(f"Docling v{self.version} loaded successfully with features: {sorted(self.available_features)}")
+            else:
+                print("Warning: Docling core components not available")
+                
+        except ImportError as e:
+            self.import_errors.append(f"Docling package import failed: {e}")
+            DOCLING_AVAILABLE = False
+            print(f"Error: Docling not available: {e}")
+    
+    def is_available(self) -> bool:
+        """Check if Docling core functionality is available."""
+        return self.DocumentConverter is not None
+    
+    def has_feature(self, feature: str) -> bool:
+        """Check if a specific feature is available."""
+        return feature.lower() in self.available_features
+    
+    def get_converter(self, **kwargs):
+        """Get a DocumentConverter instance with optional configuration."""
+        if not self.is_available():
+            raise ImportError("Docling DocumentConverter is not available")
+        
+        try:
+            # Apply configuration if available
+            if self.PipelineOptions and kwargs:
+                pipeline_options = self.PipelineOptions(**kwargs)
+                return self.DocumentConverter(pipeline_options=pipeline_options)
+            else:
+                return self.DocumentConverter()
+        except Exception as e:
+            logger.error(f"Failed to create DocumentConverter: {e}")
+            raise
+    
+    def get_import_summary(self) -> dict:
+        """Get a summary of import status and available features."""
+        return {
+            'available': self.is_available(),
+            'version': self.version,
+            'features': sorted(self.available_features),
+            'errors': self.import_errors
+        }
+
+# Initialize Docling imports with lazy loading
+_docling_imports = None
+
+def get_docling_imports() -> DoclingImports:
+    """Get the singleton DoclingImports instance."""
+    global _docling_imports
+    if _docling_imports is None:
+        _docling_imports = DoclingImports()
+    return _docling_imports
+
+# Initialize imports immediately to set DOCLING_AVAILABLE flag
+get_docling_imports()
 
 # Type definitions for better code clarity
 T = TypeVar('T')
 HandlerFunction = Callable[..., Awaitable[Any]]
 StreamType = Any  # MCP stream type (not directly accessible from imports)
 
+# Global logger variable
+logger: logging.Logger = logging.getLogger(__name__)
 
 class DoclingMCPServer:
     """Docling MCP Server with official implementation patterns and configuration."""
@@ -84,6 +207,13 @@ class DoclingMCPServer:
         self.server: Server = Server(config.server.name)
         self.capabilities: Optional[Any] = None
         
+        # Initialize logger first to avoid undefined logger errors
+        self.setup_logging()
+        
+        # Get logger after setup
+        global logger
+        logger = logging.getLogger(self.config.logging.name)
+        
         # Initialize metrics system
         self.metrics_collector: Optional[MetricsCollector] = None
         self.metrics_storage: Optional[MetricsStorage] = None
@@ -92,7 +222,6 @@ class DoclingMCPServer:
         self.alert_manager: Optional[AlertManager] = None
         
         self.setup_handlers()
-        self.setup_logging()
         self.setup_metrics()
         
         logger.info(f"Docling MCP Server '{config.server.name}' initialized")
@@ -387,7 +516,9 @@ class DoclingMCPServer:
             if self.config.docling.enable_cache:
                 os.environ['DOCLING_CACHE_DIR'] = self.config.docling.cache_dir
             
-            converter: DocumentConverter = DocumentConverter()
+            # Get converter with enhanced configuration
+            docling_imports = get_docling_imports()
+            converter = docling_imports.get_converter()
             result: Any = converter.convert(file_path)
             
             content: str
@@ -441,7 +572,9 @@ class DoclingMCPServer:
                 if self.config.docling.enable_cache:
                     os.environ['DOCLING_CACHE_DIR'] = self.config.docling.cache_dir
                 
-                converter: DocumentConverter = DocumentConverter()
+                # Get converter with enhanced configuration
+                docling_imports = get_docling_imports()
+                converter = docling_imports.get_converter()
                 result: Any = converter.convert(file_path)
                 
                 content: str
@@ -811,11 +944,15 @@ def main() -> None:
                 environment=args.environment,
                 config_file=args.config_file
             )
+            # Initialize logger after config is loaded
+            server = DoclingMCPServer(config)
             logger.info(f"Loaded configuration for environment: {args.environment}")
         else:
             # Fallback to default configuration
             from config.schema import Config
             config = Config()
+            # Initialize logger after config is loaded
+            server = DoclingMCPServer(config)
             logger.warning("Using default configuration (config system not available)")
     except Exception as e:
         print(f"Error loading configuration: {e}")
