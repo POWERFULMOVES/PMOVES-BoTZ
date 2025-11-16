@@ -1,0 +1,28 @@
+mcpServers:
+  docling:
+    type: http
+    url: http://docling-mcp:${DOCLING_MCP_PORT:-3020}
+    timeout: 30
+    retries: 3
+  postman:
+    type: http
+    url: https://mcp.postman.com/mcp
+    headers:
+      Authorization: "Bearer ${POSTMAN_API_KEY}"
+    timeout: 30
+    retries: 3
+  cipher-memory:
+    type: http
+    url: http://cipher-memory:${CIPHER_API_PORT:-3011}
+    timeout: 30
+    retries: 3
+  e2b-runner:
+    type: http
+    url: http://e2b-runner:${E2B_RUNNER_PORT:-7071}
+    timeout: 30
+    retries: 3
+  vl-sentinel:
+    type: http
+    url: http://vl-sentinel:${VL_SENTINEL_PORT:-7072}
+    timeout: 30
+    retries: 3

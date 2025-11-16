@@ -1,0 +1,59 @@
+# Dockerfile for POWERFULMOVES/docling MCP Server with Configuration Support
+FROM python:3.11-slim-bullseye
+
+WORKDIR /srv
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy docling submodule first (vendored under features/docling/docling)
+COPY features/docling/docling/ ./docling/
+
+# Install docling from local submodule
+RUN pip install --no-cache-dir ./docling/
+
+# Copy configuration directory (may be empty in minimal deployments)
+COPY features/docling/config/ ./config/
+
+# Copy metrics package (for /metrics and /dashboard, optional)
+COPY features/docling/metrics/ ./metrics/
+
+# Copy the advanced MCP server implementation (with HTTP + /health)
+COPY docling_mcp_server.from_container.py ./docling_mcp_server.py
+
+# Verify the file was copied correctly
+RUN python -c "with open('/srv/docling_mcp_server.py', 'r') as f: content = f.read(); print('File contains configuration support:' if 'Config' in content else 'File missing configuration support')"
+
+# Copy and install MCP server requirements
+COPY features/docling/docling_mcp_requirements.txt ./docling_mcp_requirements.txt
+RUN pip install --no-cache-dir -r docling_mcp_requirements.txt
+
+# Install PyYAML for configuration support
+RUN pip install --no-cache-dir pyyaml
+
+WORKDIR /srv
+
+# Create data directory for cache
+RUN mkdir -p /data/cache
+
+# Create logs directory
+RUN mkdir -p /var/log
+
+# Expose port
+EXPOSE 3020
+
+# Health check using configuration
+HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
+    CMD curl -f -H "Accept: text/event-stream" http://localhost:3020/health || exit 1
+
+# Default environment variables for configuration
+ENV DOCLING_MCP_SERVER__TRANSPORT=http \
+    DOCLING_MCP_SERVER__HOST=0.0.0.0 \
+    DOCLING_MCP_SERVER__PORT=3020 \
+    DOCLING_MCP_LOGGING__LEVEL=INFO \
+    DOCLING_MCP_DOCLING__CACHE_DIR=/data/cache
+
+# Run the MCP server with HTTP transport and configuration support
+CMD ["python", "docling_mcp_server.py"]
