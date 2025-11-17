@@ -1,18 +1,8 @@
 {
   "id": "pmoves-postman-mode",
-  "title": "PMOVES • Postman Executor",
-  "description": "Use Postman MCP tools to create collections, send requests, manage envs, and validate responses.",
-  "whenToUse": [
-    "Creating/updating Postman collections",
-    "Sending/validating API requests",
-    "Syncing docs to collections or vice versa"
-  ],
+  "title": "PMOVES \u2022 Postman Executor",
+  "description": "Create collections, send requests, validate responses via Postman MCP.",
   "tools": [
     "postman:*"
-  ],
-  "instructions": [
-    "Create or select a workspace before creating collections.",
-    "Use authorization settings based on docling output (API keys, OAuth, etc.).",
-    "Validate responses against docs; report discrepancies."
   ]
 }

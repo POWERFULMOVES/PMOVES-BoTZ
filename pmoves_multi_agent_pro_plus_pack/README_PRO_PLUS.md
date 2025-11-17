@@ -1,6 +1,8 @@
-# PMOVES MCP PRO+ Upgrades
+# [DEPRECATED] PMOVES MCP PRO+ Upgrades
 
-This add-on pack includes:
+This add-on pack is superseded by `core/` + `features/` overlays with the PMOVES‑BotZ gateway. See `docs/SETUP_GUIDE.md` for current commands.
+
+This add-on pack previously included:
 1) **Local Postman MCP (STDIO)** overlay for offline/local use.
 2) **Docling VLM overlay** to run the VL pipeline (`--pipeline vlm`).
 3) **Automated Postman collection generator** from OpenAPI.

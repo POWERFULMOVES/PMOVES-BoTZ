@@ -1,4 +1,15 @@
-# PMOVES Multi‑Agent MCP Pack (Docling + Postman + Kilo)
+# [DEPRECATED] PMOVES Multi-Agent MCP Pack (Docling + Postman + Kilo)
+
+This pack is superseded by the unified overlays under `core/` + `features/` and the PMOVES‑BotZ gateway. Use:
+
+```
+docker compose --env-file .env \
+  -f core/docker-compose/base.yml \
+  -f features/pro/docker-compose.yml \
+  up -d
+```
+
+For details, see `docs/SETUP_GUIDE.md`.
 
 This pack adds **Docling MCP** (Docker HTTP server) and **Postman MCP** (hosted HTTP) to your portable agent box, plus **Kilo Code** modes and templates.
 

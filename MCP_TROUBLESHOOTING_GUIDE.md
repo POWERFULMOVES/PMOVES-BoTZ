@@ -116,7 +116,7 @@ docker compose -f docker-compose.mcp-pro.yml up docling-mcp
 docker logs pmoves_multi_agent_pro_pack-mcp-gateway-1 | grep -i "docling\|connection\|error"
 
 # Verify catalog file exists
-docker exec -it pmoves_multi_agent_pro_pack-mcp-gateway-1 ls -la /app/mcp_catalog_multi.yaml
+docker exec -it pmoves_multi_agent_pro_pack-mcp-gateway-1 ls -la /app/mcp_catalog.yaml
 
 # Test network connectivity between services
 docker exec -it pmoves_multi_agent_pro_pack-mcp-gateway-1 ping docling-mcp
@@ -127,7 +127,7 @@ docker exec -it pmoves_multi_agent_pro_pack-mcp-gateway-1 curl -v http://docling
 
 1. **Fix Catalog Configuration**:
 ```yaml
-# In mcp_catalog_multi.yaml, ensure proper endpoint:
+# In mcp_catalog.yaml, ensure proper endpoint:
 servers:
   docling:
     type: http
@@ -253,7 +253,7 @@ from mcp.server.cors import cors_middleware
 docker exec -it pmoves_multi_agent_pro_pack-mcp-gateway-1 env | grep -E "POSTMAN_API_KEY|E2B_API_KEY"
 
 # Check if variables are properly substituted in config files
-docker exec -it pmoves_multi_agent_pro_pack-mcp-gateway-1 cat /app/mcp_catalog_multi.yaml | grep -i bearer
+docker exec -it pmoves_multi_agent_pro_pack-mcp-gateway-1 cat /app/mcp_catalog.yaml | grep -i bearer
 ```
 
 ### Dependency and Import Issues
@@ -389,7 +389,7 @@ When reporting issues, provide:
 
 1. **Service Status**: Output of `docker compose -f docker-compose.mcp-pro.yml ps`
 2. **Error Logs**: Relevant error messages from service logs
-3. **Configuration**: Your `mcp_catalog_multi.yaml` and relevant environment variables
+3. **Configuration**: Your `mcp_catalog.yaml` and relevant environment variables
 4. **System Info**: Docker version, OS, available resources
 5. **Reproduction Steps**: Exact commands that led to the issue
 

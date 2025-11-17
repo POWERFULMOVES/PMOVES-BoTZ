@@ -115,6 +115,10 @@ def main():
         cipher_api = os.environ.get('CIPHER_API_PORT') or host_port('cipher-memory','3011')
         if cipher_api:
             cfg['mcpServers']['cipher-direct'] = { 'transport':'http', 'url': f"http://localhost:{cipher_api}" }
+        # Crush direct (if mapped)
+        crush_port = os.environ.get('CRUSH_PORT') or host_port('crush-shim','7069')
+        if crush_port:
+            cfg['mcpServers']['crush-direct'] = { 'transport':'http', 'url': f"http://localhost:{crush_port}" }
 
         with open(LOCAL_MCP_JSON, 'w') as f:
             json.dump(cfg, f, indent=2)

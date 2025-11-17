@@ -1,0 +1,4 @@
+networks:
+  pmoves_ai:
+    external: true
+    name: ${PMOVES_AI_NETWORK:-pmoves-net}

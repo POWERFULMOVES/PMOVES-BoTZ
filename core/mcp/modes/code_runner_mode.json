@@ -1,18 +1,23 @@
 {
-  "id": "pmoves-code-runner-mode",
-  "title": "PMOVES • Code Runner",
-  "description": "Execute code in secure E2B sandbox environments.",
+  "id": "pmoves-code-runner",
+  "title": "PMOVES • Code Runner (E2B)",
+  "description": "Run generated code in isolated sandboxes via E2B with memory persistence. Prefer Python unless otherwise requested.",
   "whenToUse": [
-    "Running code snippets or scripts",
-    "Testing code in isolated environments",
-    "Prototyping and experimentation"
+    "Executing code snippets safely",
+    "Data wrangling or quick proofs of concept",
+    "Running tests or scripts independent of local machine",
+    "Code execution requiring learning from past runs"
   ],
   "tools": [
-    "e2b:*"
+    "e2b:*",
+    "cipher-memory:*"
   ],
   "instructions": [
-    "Use E2B sandbox for secure code execution.",
-    "Specify appropriate runtime environments (Python, Node.js, etc.).",
-    "Handle dependencies and package installations as needed."
+    "Search cipher memory for similar code patterns and solutions before execution.",
+    "Use the /sandbox/run endpoint for single-run tasks; set keep_alive=true for multi-step sessions.",
+    "Always echo results in JSON to simplify parsing.",
+    "Save artifacts to /home/user and return file paths for downstream steps.",
+    "Store successful code patterns and solutions in cipher memory for future reference.",
+    "Document any errors or issues encountered for troubleshooting knowledge base."
   ]
 }

@@ -74,8 +74,8 @@
 4. **Health Check Debugging**: Investigate E2B and VL Sentinel startup issues
 
 ### Configuration Files to Update:
-- `pmoves_multi_agent_pro_pack/mcp_gateway/run_gateway.py`
-- `pmoves_multi_agent_pro_pack/mcp_gateway/gateway.py`
+- `MCP_GATEWAY_INTEGRATION_NOTES.md`
+- `MCP_GATEWAY_INTEGRATION_NOTES.md`
 - Environment variables for POSTMAN_API_KEY
 
 ## 📈 **Service Launch Progress**

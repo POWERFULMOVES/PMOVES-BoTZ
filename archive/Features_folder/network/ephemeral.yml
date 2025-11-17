@@ -1,0 +1,30 @@
+services:
+  mcp-gateway:
+    ports:
+      - target: 8000
+        published: 0
+        protocol: tcp
+  docling-mcp:
+    ports:
+      - target: 3020
+        published: 0
+        protocol: tcp
+  e2b-runner:
+    ports:
+      - target: 7071
+        published: 0
+        protocol: tcp
+  vl-sentinel:
+    ports:
+      - target: 7072
+        published: 0
+        protocol: tcp
+  cipher-memory:
+    ports:
+      - target: 3010
+        published: 0
+        protocol: tcp
+      - target: 3011
+        published: 0
+        protocol: tcp
+

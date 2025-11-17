@@ -1,12 +1,12 @@
 # PMOVES‑BotZ Quick Start
 
-## Option A: Standalone (Local‑First with Ollama)
+## Option A: Self‑Hosted (with Ollama)
 
 1) Local‑first bootstrap (.env auto‑created at repo root)
 
 - The bring‑up scripts read `.env` from the repo root.
 - If `.env` is missing, `scripts/bring_up_pmoves_botz.(ps1|sh)` will auto‑create it from `core/example.env` and feature examples, so you don’t have to cd into subfolders.
-- Defaults bias to local‑first:
+- Self‑hosted defaults:
   - `VL_PROVIDER=ollama`
   - `OLLAMA_BASE_URL=http://host.docker.internal:11434`
 
@@ -74,6 +74,14 @@ docker compose --env-file .env `
 - Docling: `http://docling-mcp:3020`
 - E2B: `http://e2b-runner:7071`  |  VL: `http://vl-sentinel:7072`
 - Cipher (optional): `http://cipher-memory:3011`
+
+## Optional: Tailscale (Linux)
+- The `tailscale` service (linux profile) can proxy the MCP gateway over your tailnet.
+- Steps:
+  - Set `TS_AUTHKEY` in `.env`.
+  - Start: `docker compose --env-file .env -f core/docker-compose/base.yml --profile linux up -d tailscale`
+  - It runs `tailscale serve https / http://127.0.0.1:2091`. Ensure the gateway maps host `:2091`.
+  - State stored in `core/ts-state/`.
 
 ## Kilo‑Bots: “Mini Transformers Team”
 - The Kilo‑Bots (Gateway, Docling, VL, E2B, Cipher) work like a mini transformers squad — each specialized, stronger together.

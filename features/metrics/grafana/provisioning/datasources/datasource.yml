@@ -1,0 +1,14 @@
+apiVersion: 1
+
+datasources:
+  - name: pmz-prom
+    type: prometheus
+    access: proxy
+    url: http://prometheus:9090
+    isDefault: true
+  - name: host-prom
+    type: prometheus
+    access: proxy
+    url: http://host.docker.internal:9090
+    isDefault: false
+

@@ -31,7 +31,7 @@ This document provides a comprehensive remediation plan for resolving critical i
 
 **Problems Identified:**
 
-1. **Catalog Configuration**: The [`mcp_catalog_multi.yaml`](pmoves_multi_agent_pro_pack/mcp_catalog_multi.yaml:1) may have incorrect server definitions
+1. **Catalog Configuration**: The [`mcp_catalog.yaml`](pmoves_multi_agent_pro_pack/mcp_catalog.yaml:1) may have incorrect server definitions
 2. **Connection Timeouts**: Inadequate timeout settings for service dependencies
 3. **Health Check Failures**: Services failing health checks due to improper startup
 
@@ -164,7 +164,7 @@ headers = {
 
 #### 3.2 Fix Catalog Configuration
 
-**Updates to [`mcp_catalog_multi.yaml`](pmoves_multi_agent_pro_pack/mcp_catalog_multi.yaml:1):**
+**Updates to [`mcp_catalog.yaml`](pmoves_multi_agent_pro_pack/mcp_catalog.yaml:1):**
 ```yaml
 servers:
   docling:

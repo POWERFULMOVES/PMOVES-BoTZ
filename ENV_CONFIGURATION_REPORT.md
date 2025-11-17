@@ -13,7 +13,7 @@ After analyzing the `.env`, `env.shared`, and `docker-compose.mcp-pro.yml` files
 - **Used by**: 
   - `cipher-memory` service (line 89 in docker-compose.mcp-pro.yml)
   - `vl-sentinel` service (line 79 in docker-compose.mcp-pro.yml)
-  - `cipher-memory` MCP server (line 20 in mcp_catalog_multi.yaml)
+  - `cipher-memory` MCP server (line 20 in mcp_catalog.yaml)
 
 ### 2. VENICE_API_KEY
 - **Status**: ✅ CONFIGURED
@@ -38,7 +38,7 @@ After analyzing the `.env`, `env.shared`, and `docker-compose.mcp-pro.yml` files
 - **Status**: ✅ CONFIGURED & ADDED
 - **Location**: Added to `.env` line 316 and `.env.local` line 316
 - **Value**: `/app`
-- **Used by**: `cipher-memory` MCP server (line 21 in mcp_catalog_multi.yaml)
+- **Used by**: `cipher-memory` MCP server (line 21 in mcp_catalog.yaml)
 
 ## Issues Identified and Fixed
 
@@ -48,7 +48,7 @@ After analyzing the `.env`, `env.shared`, and `docker-compose.mcp-pro.yml` files
 **Fix Applied**: Updated docker-compose.mcp-pro.yml lines 13 and 26 to use `TAILSCALE_AUTHKEY=${TAILSCALE_AUTHKEY}`
 
 ### 2. ✅ FIXED: Environment Variable Inheritance in MCP Catalog
-**Issue**: The `cipher-memory` MCP server defined in `mcp_catalog_multi.yaml` uses environment variable substitution, but the MCP gateway might not be properly inheriting all environment variables.
+**Issue**: The `cipher-memory` MCP server defined in `mcp_catalog.yaml` uses environment variable substitution, but the MCP gateway might not be properly inheriting all environment variables.
 
 **Fix Applied**: Updated env.shared to actively export all required variables instead of commenting them out.
 

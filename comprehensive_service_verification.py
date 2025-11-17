@@ -33,7 +33,7 @@ class ServiceVerifier:
                 "health_endpoint": "/health",
                 "expected_status": "healthy",
                 "description": "MCP Gateway service",
-                "container_name": "pmoves_multi_agent_pro_pack-mcp-gateway-1"
+                "container_name": "pmoves-botz-mcp-gateway-1"
             },
             "docling-mcp": {
                 "port": 3020,
@@ -41,7 +41,7 @@ class ServiceVerifier:
                 "health_endpoint": "/health",
                 "expected_status": "healthy",
                 "description": "Docling MCP service",
-                "container_name": "pmoves_multi_agent_pro_pack-docling-mcp-1"
+                "container_name": "pmoves-botz-docling-mcp-1"
             },
             "e2b-runner": {
                 "port": 7071,
@@ -49,7 +49,7 @@ class ServiceVerifier:
                 "health_endpoint": "/health",
                 "expected_status": "healthy",
                 "description": "E2B Runner service",
-                "container_name": "pmoves_multi_agent_pro_pack-e2b-runner-1"
+                "container_name": "pmoves-botz-e2b-runner-1"
             },
             "vl-sentinel": {
                 "port": 7072,
@@ -57,7 +57,7 @@ class ServiceVerifier:
                 "health_endpoint": "/health", 
                 "expected_status": "healthy",
                 "description": "VL Sentinel service",
-                "container_name": "pmoves_multi_agent_pro_pack-vl-sentinel-1"
+                "container_name": "pmoves-botz-vl-sentinel-1"
             },
             "cipher-memory": {
                 "port": None,
@@ -65,7 +65,7 @@ class ServiceVerifier:
                 "health_endpoint": None,
                 "expected_status": "stdio_running",
                 "description": "Cipher Memory service (STDIO)",
-                "container_name": "pmoves_multi_agent_pro_pack-cipher-memory-1",
+                "container_name": "pmoves-botz-cipher-memory-1",
                 "stdio_check": True
             },
             "postman-mcp-local": {
@@ -74,7 +74,7 @@ class ServiceVerifier:
                 "health_endpoint": None,
                 "expected_status": "process_running",
                 "description": "Postman MCP Local service (process-based)",
-                "container_name": "pmoves_multi_agent_pro_plus_pack-postman-mcp-local-1",
+                "container_name": "pmoves-botz-postman-mcp-local-1",
                 "process_check": True
             },
             "tailscale": {
@@ -83,7 +83,7 @@ class ServiceVerifier:
                 "health_endpoint": None,
                 "expected_status": "vpn_connected",
                 "description": "Tailscale VPN service",
-                "container_name": "pmoves_multi_agent_pro_pack-tailscale-1",
+                "container_name": "pmoves-botz-tailscale-1",
                 "vpn_check": True
             }
         }

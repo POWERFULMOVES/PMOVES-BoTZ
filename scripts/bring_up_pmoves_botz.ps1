@@ -32,6 +32,7 @@ if (-not $env:GATEWAY_PORT) { $env:GATEWAY_PORT = '2091' }
 if (-not $env:DOCLING_PORT) { $env:DOCLING_PORT = '3020' }
 if (-not $env:E2B_PORT) { $env:E2B_PORT = '7071' }
 if (-not $env:VL_PORT) { $env:VL_PORT = '7072' }
+$env:CRUSH_PORT = if ($env:CRUSH_PORT) { $env:CRUSH_PORT } else { '7069' }
 $env:PROMETHEUS_PORT = $PrometheusPort
 $env:GRAFANA_PORT = $GrafanaPort
 $env:ALERTMANAGER_PORT = $AlertmanagerPort

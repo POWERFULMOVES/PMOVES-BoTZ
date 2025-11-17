@@ -16,11 +16,14 @@
 
 param(
     [Parameter(Mandatory=$false)]
-    [ValidateSet("basic", "pro", "mini", "pro-plus", "full")]
+    [ValidateSet("basic", "pro", "pro-proxy", "mini", "pro-plus", "full")]
     [string]$Config = "basic",
 
     [Parameter(Mandatory=$false)]
-    [switch]$DryRun
+    [switch]$DryRun,
+
+    [Parameter(Mandatory=$false)]
+    [string]$Namespace = "botz-dev"
 )
 
 $ErrorActionPreference = "Stop"
@@ -37,6 +40,7 @@ $FeatureFlags = @{
 $ComposeFiles = @{
     "basic" = @("core/docker-compose/base.yml")
     "pro" = @("core/docker-compose/base.yml", "features/pro/docker-compose.yml")
+    "pro-proxy" = @("core/docker-compose/base.yml", "features/pro/docker-compose.yml", "features/gateway-proxy/docker-compose.yml")
     "mini" = @("core/docker-compose/base.yml", "features/mini/docker-compose.yml")
     "pro-plus" = @("core/docker-compose/base.yml", "features/pro-plus/docker-compose.yml")
     "full" = @("core/docker-compose/base.yml", "features/pro/docker-compose.yml", "features/mini/docker-compose.yml", "features/pro-plus/docker-compose.yml")
@@ -161,7 +165,9 @@ function Start-Services {
 
     $composeArgs = $ComposeFiles | ForEach-Object { "-f", $_ }
     try {
-        & docker compose $composeArgs up -d
+        $env:PMZ_NAMESPACE = $Namespace
+        if (-not $env:COMPOSE_PROJECT_NAME) { $env:COMPOSE_PROJECT_NAME = $Namespace }
+        & docker compose --project-name $env:COMPOSE_PROJECT_NAME --env-file .env $composeArgs up -d
         Write-Success "Services started successfully"
     } catch {
         Write-Error "Failed to start services: $_"

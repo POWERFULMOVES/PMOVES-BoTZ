@@ -1,8 +1,0 @@
-{
-  "id": "pmoves-docling-mode",
-  "title": "PMOVES \u2022 Docling Analyst",
-  "description": "Convert, parse, and extract API docs (PDF/HTML/OpenAPI) with VL support.",
-  "tools": [
-    "docling:*"
-  ]
-}

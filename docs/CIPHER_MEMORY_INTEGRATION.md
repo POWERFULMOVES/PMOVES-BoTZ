@@ -212,7 +212,13 @@ cipher-memory:
   volumes:
     - ./memory_shim/pmoves_cipher:/app/memory_shim/pmoves_cipher:ro
     - cipher_data:/data
-  network_mode: host
+  labels:
+      pmoves.service: "cipher"
+      pmoves.health: "http://cipher-memory:3011/health"
+  networks:
+      default:
+        aliases: ["pmoves-botz_cipher", "cipher-memory"]
+      pmoves_ai: {}
 ```
 
 ### Volume Management
@@ -230,11 +236,16 @@ python scripts/smoke_tests.py
 ```
 
 **Test Categories:**
-- Cipher Submodule: Verifies git submodule is initialized
-- Cipher Build: Confirms cipher is compiled
-- OpenAI API: Validates API key format
-- Cipher Config: Checks PMOVES configuration exists
-- Memory Server: Verifies MCP server script
+- Cipher Submodule: Verifies cipher feature tree and build artifacts exist under `features/cipher/pmoves_cipher`
+- Cipher Build: Confirms the Node-based Cipher API bundle (`dist/src/app/index.cjs`) is present
+- OpenAI/Venice API: Validates API key format (or treats local-only mode as a soft pass)
+- Cipher Config: Checks PMOVES cipher configuration exists under `memAgent/cipher.yml`
+- Memory Server: Verifies the Cipher HTTP health endpoint at `/health`
+- Cipher Functional API: Verifies key HTTP surfaces:
+  - `/.well-known/agent.json` (agent discovery & metadata)
+  - `/api/sessions` (read-only sessions listing for memory workflows)
+- Cipher Message Roundtrip (optional): Probes `/api/message/sync` with a small test prompt.
+  - Any non-2xx is treated as informational only (to avoid hard-coding upstream LLM credentials into smoke tests), but confirms routing and endpoint wiring.
 
 ### Manual Testing
 

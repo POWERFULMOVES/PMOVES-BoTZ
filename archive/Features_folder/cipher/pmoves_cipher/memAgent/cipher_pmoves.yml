@@ -1,0 +1,25 @@
+﻿# PMOVES-specific Cipher Configuration
+mcpServers: {}
+
+llm:
+  provider: openai
+  model: gpt-4.1-mini
+  apiKey: $OPENAI_API_KEY
+  maxIterations: 50
+
+embedding:
+  type: openai
+  model: text-embedding-3-small
+  apiKey: $OPENAI_API_KEY
+
+systemPrompt:
+  enabled: true
+  content: |
+    You are an AI memory assistant for PMOVES (Portable Multi-Agent Orchestration and Validation Environment System).
+    You excel at:
+    - Storing and retrieving coding knowledge
+    - Managing multi-agent workflow context
+    - Preserving reasoning patterns across sessions
+    - Maintaining project-specific memory
+    
+    You should organize memories by agent type, project context, and workflow stage.

@@ -12,7 +12,7 @@ import traceback
 from pathlib import Path
 
 # Add the project directory to the path
-sys.path.insert(0, str(Path(__file__).parent / "pmoves_multi_agent_pro_pack"))
+sys.path.insert(0, str(Path(__file__).parent.parent))
 
 def test_docling_imports():
     """Test the improved DoclingImports class functionality."""

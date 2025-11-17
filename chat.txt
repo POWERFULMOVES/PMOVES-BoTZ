@@ -1,0 +1,973 @@
+. Added optional YT mini smoke test                                                                                                                                                                                                                    
+                                                                                                                                                                                                                                                          
+  In scripts/smoke_tests.py:                                                                                                                                                                                                                              
+                                                                                                                                                                                                                                                          
+  - New method: test_yt_mini:                                                                                                                                                                                                                             
+      - Only active when you explicitly enable it:                                                                                                                                                                                                        
+                                                                                                                                                                                                                                                          
+        if os.getenv("PMOVES_YT_ENABLED") != "1":                                                                                                                                                                                                         
+            self.log("YT mini: skipping (PMOVES_YT_ENABLED != 1)", "PASS")                                                                                                                                                                                
+            return True                                                                                                                                                                                                                                   
+      - When enabled, it:                                                                                                                                                                                                                                 
+          - Hits http://localhost:${YT_MINI_PORT:-3050}/health and requires HTTP 2xx.                                                                                                                                                                     
+          - Performs a best-effort CLI check:                                                                                                                                                                                                             
+                                                                                                                                                                                                                                                          
+            yt_cli = os.getenv("YT_MINI_CLI") or "yt-mini"                                                                                                                                                                                                
+            subprocess.run([yt_cli, "--version"], ...)                                                                                                                                                                                                    
+  - Hooked into the main test list:
+
+    ("YT Mini Agent", self.test_yt_mini),
+  - Current behavior (with PMOVES_YT_ENABLED unset):
+  4. Existing Cipher CLI/agent behavior in this model
+
+  - We already have Cipher as a first-class mini agent:
+      - CLI / service: features/cipher/pmoves_cipher with:
+          - Node-based API (cipher-memory container).
+          - UI + API health endpoints.
+      - Docs (docs/CIPHER_MEMORY_INTEGRATION.md) now describe:
+          - Static checks (build, config, keys).
+          - Runtime health.
+          - Functional HTTP checks (agent discovery, sessions).
+          - Optional message roundtrip, tolerant of upstream LLM auth issues.
+  - This matches your plan where:
+      - Cipher is the first agent that can talk to the user via CLI, explain what’s available, and then:
+          - Offer choices (Ollama vs cloud LLM).
+          - Help them bootstrap other agents (e.g., YT mini, Docling) as part of the CLI “city”.
+
+  We haven’t yet built the interactive CLI layer itself (with repo indexing, crosslinks, and helpers), but the docs + overlays + smoke tests now assume that architecture: CLI mini agents that can bootstrap their services, with Cipher and YT mini as  
+  named examples.
+
+  If you’d like, the next step could be:
+
+  - Scaffolding a small, repo-aware CLI (e.g., scripts/pmoves_cli.py or a Node-based CLI) that:
+      - Lists available mini agents (Cipher, Docling, soon YT).
+      - Checks health via the existing smoke test endpoints.
+      - Offers interactive prompts to start/stop services or choose LLM backends (Ollama vs cloud).
+
+
+› yes please
+
+
+• Ran pwsh.exe -Command 'Get-ChildItem scripts'
+  └                                                                                                                                                                                                                                                       
+        Directory: C:\Users\russe\Documents\GitHub\PMOVES-Kilobots\scripts                                                                                                                                                                                
+    … +18 lines                                                                                                                                                                                                                                           
+    -a---          11/15/2025 12:07 PM            229 start.sh                                                                                                                                                                                            
+                                                                                                                                                                                                                                                          
+                                                                                                                                                                                                                                                          
+• Added scripts\pmoves_cli.py (+248 -0)                                                                                                                                                                                                                   
+      1 +#!/usr/bin/env python3                                                                                                                                                                                                                           
+      2 +"""                                                                                                                                                                                                                                              
+      3 +PMOVES-BoTZ CLI                                                                                                                                                                                                                                  
+      4 +                                                                                                                                                                                                                                                 
+      5 +A lightweight, interactive CLI for exploring and coordinating the PMOVES-BoTZ                                                                                                                                                                    
+      6 +mini-agent stack from the terminal. It treats core services (Cipher, Docling,                                                                                                                                                                    
+      7 +VL-Sentinel, future YT mini, etc.) as a small "team" of agents and provides                                                                                                                                                                      
+      8 +simple helpers to:                                                                                                                                                                                                                               
+      9 +                                                                                                                                                                                                                                                 
+     10 +- Inspect agent roles and endpoints.                                                                                                                                                                                                             
+     11 +- Run basic health/status checks.                                                                                                                                                                                                                
+     12 +- Discover relevant documentation in the repo.                                                                                                                                                                                                   
+     13 +                                                                                                                                                                                                                                                 
+     14 +This is intentionally minimal and safe: it never mutates data, it just calls                                                                                                                                                                     
+     15 +existing scripts and HTTP health endpoints.                                                                                                                                                                                                      
+     16 +"""                                                                                                                                                                                                                                              
+     17 +                                                                                                                                                                                                                                                 
+     18 +import argparse                                                                                                                                                                                                                                  
+     19 +import os                                                                                                                                                                                                                                        
+     20 +import subprocess                                                                                                                                                                                                                                
+     21 +import sys                                                                                                                                                                                                                                       
+     22 +from pathlib import Path                                                                                                                                                                                                                         
+     23 +from typing import Dict, List                                                                                                                                                                                                                    
+     24 +                                                                                                                                                                                                                                                 
+     25 +import requests                                                                                                                                                                                                                                  
+     26 +                                                                                                                                                                                                                                                 
+     27 +BASE_DIR = Path(__file__).parent.parent                                                                                                                                                                                                          
+     28 +                                                                                                                                                                                                                                                 
+     29 +                                                                                                                                                                                                                                                 
+     30 +AGENTS: Dict[str, Dict[str, str]] = {                                                                                                                                                                                                            
+     31 +    "gateway": {                                                                                                                                                                                                                                 
+     32 +        "name": "Gateway",                                                                                                                                                                                                                       
+     33 +        "description": "HTTP MCP gateway and big-bro orchestrator.",                                                                                                                                                                             
+     34 +        "health": "http://localhost:{port}/health",                                                                                                                                                                                              
+     35 +        "port_env": "MCP_GATEWAY_PORT",                                                                                                                                                                                                          
+     36 +        "default_port": "2091",                                                                                                                                                                                                                  
+     37 +    },                                                                                                                                                                                                                                           
+     38 +    "docling": {                                                                                                                                                                                                                                 
+     39 +        "name": "Docling",                                                                                                                                                                                                                       
+     40 +        "description": "Document MCP server for parsing and conversion.",                                                                                                                                                                        
+     41 +        "health": "http://localhost:{port}/health",                                                                                                                                                                                              
+     42 +        "port_env": "DOCLING_MCP_PORT",                                                                                                                                                                                                          
+     43 +        "default_port": "3020",                                                                                                                                                                                                                  
+     44 +    },                                                                                                                                                                                                                                           
+     45 +    "cipher": {                                                                                                                                                                                                                                  
+     46 +        "name": "Cipher",                                                                                                                                                                                                                        
+     47 +        "description": "Memory-powered agent API (UI/API on 3010/3011).",                                                                                                                                                                        
+     48 +        "health": "http://localhost:{port}/health",                                                                                                                                                                                              
+     49 +        "port_env": "CIPHER_API_PORT",                                                                                                                                                                                                           
+     50 +        "default_port": "3011",                                                                                                                                                                                                                  
+     51 +    },                                                                                                                                                                                                                                           
+     52 +    "vl": {                                                                                                                                                                                                                                      
+     53 +        "name": "VL-Sentinel",                                                                                                                                                                                                                   
+     54 +        "description": "Vision-language sentinel backed by Ollama.",                                                                                                                                                                             
+     55 +        "health": "http://localhost:{port}/health",                                                                                                                                                                                              
+     56 +        "port_env": "VL_PORT",
+     57 +        "default_port": "7072",                                                                                                                                                                                                                  
+     58 +    },                                                                                                                                                                                                                                           
+     59 +    "yt-mini": {                                                                                                                                                                                                                                 
+     60 +        "name": "YT Mini",                                                                                                                                                                                                                       
+     61 +        "description": "Planned YouTube/media mini agent (features/yt overlay).",                                                                                                                                                                
+     62 +        "health": "http://localhost:{port}/health",                                                                                                                                                                                              
+     63 +        "port_env": "YT_MINI_PORT",                                                                                                                                                                                                              
+     64 +        "default_port": "3050",                                                                                                                                                                                                                  
+     65 +    },                                                                                                                                                                                                                                           
+     66 +}                                                                                                                                                                                                                                                
+     67 +                                                                                                                                                                                                                                                 
+     68 +                                                                                                                                                                                                                                                 
+     69 +def run_powershell_script(script: str, args: List[str] | None = None) -> int:                                                                                                                                                                    
+     70 +    """Run a PowerShell script from the repo root."""                                                                                                                                                                                            
+     71 +    script_path = BASE_DIR / "scripts" / script                                                                                                                                                                                                  
+     72 +    if not script_path.exists():                                                                                                                                                                                                                 
+     73 +        print(f"[cli] Script not found: {script_path}")                                                                                                                                                                                          
+     74 +        return 1                                                                                                                                                                                                                                 
+     75 +                                                                                                                                                                                                                                                 
+     76 +    cmd = ["pwsh", "-File", str(script_path)]                                                                                                                                                                                                    
+     77 +    if args:                                                                                                                                                                                                                                     
+     78 +        cmd.extend(args)                                                                                                                                                                                                                         
+     79 +                                                                                                                                                                                                                                                 
+     80 +    result = subprocess.run(cmd)                                                                                                                                                                                                                 
+     81 +    return result.returncode                                                                                                                                                                                                                     
+     82 +                                                                                                                                                                                                                                                 
+     83 +                                                                                                                                                                                                                                                 
+     84 +def cmd_status(_: argparse.Namespace) -> None:                                                                                                                                                                                                   
+     85 +    """Show PMOVES-BoTZ status via existing status script."""                                                                                                                                                                                    
+     86 +    if os.name == "nt":                                                                                                                                                                                                                          
+     87 +        code = run_powershell_script("pmoves_status.ps1")                                                                                                                                                                                        
+     88 +    else:                                                                                                                                                                                                                                        
+     89 +        script_path = BASE_DIR / "scripts" / "pmoves_status.sh"                                                                                                                                                                                  
+     90 +        result = subprocess.run(["bash", str(script_path)])                                                                                                                                                                                      
+     91 +        code = result.returncode                                                                                                                                                                                                                 
+     92 +                                                                                                                                                                                                                                                 
+     93 +    if code != 0:                                                                                                                                                                                                                                
+     94 +        print(f"[cli] Status command exited with code {code}")                                                                                                                                                                                   
+     95 +                                                                                                                                                                                                                                                 
+     96 +                                                                                                                                                                                                                                                 
+     97 +def cmd_list_agents(_: argparse.Namespace) -> None:                                                                                                                                                                                              
+     98 +    """List known mini agents and their roles."""                                                                                                                                                                                                
+     99 +    print("PMOVES-BoTZ mini agents:\n")                                                                                                                                                                                                          
+    100 +    for key, meta in AGENTS.items():                                                                                                                                                                                                             
+    101 +        print(f"- {key:8s} : {meta['name']}")                                                                                                                                                                                                    
+    102 +        print(f"    {meta['description']}")                                                                                                                                                                                                      
+    103 +    print()                                                                                                                                                                                                                                      
+    104 +                                                                                                                                                                                                                                                 
+    105 +                                                                                                                                                                                                                                                 
+    106 +def _resolve_port(agent_key: str) -> str:                                                                                                                                                                                                        
+    107 +    meta = AGENTS[agent_key]                                                                                                                                                                                                                     
+    108 +    port = os.getenv(meta["port_env"])                                                                                                                                                                                                           
+    109 +    if not port:                                                                                                                                                                                                                                 
+    110 +        port = meta["default_port"]                                                                                                                                                                                                              
+    111 +    return port                                                                                                                                                                                                                                  
+    112 +                                                                                                                                                                                                                                                 
+    113 +                                                                                                                                                                                                                                                 
+    114 +def cmd_agent_info(args: argparse.Namespace) -> None:                                                                                                                                                                                            
+    115 +    """Show details and health for a specific agent."""                                                                                                                                                                                          
+    116 +    key = args.name                                                                                                                                                                                                                              
+    117 +    if key not in AGENTS:                                                                                                                                                                                                                        
+    118 +        print(f"[cli] Unknown agent '{key}'. Use 'list-agents' to see available agents.")                                                                                                                                                        
+    119 +        return                                                                                                                                                                                                                                   
+    120 +                                                                                                                                                                                                                                                 
+    121 +    meta = AGENTS[key]
+    122 +    port = _resolve_port(key)                                                                                                                                                                                                                    
+    123 +    health_url = meta["health"].format(port=port)                                                                                                                                                                                                
+    124 +                                                                                                                                                                                                                                                 
+    125 +    print(f"{meta['name']} ({key})")                                                                                                                                                                                                             
+    126 +    print(f"- Description : {meta['description']}")                                                                                                                                                                                              
+    127 +    print(f"- Health URL  : {health_url}")                                                                                                                                                                                                       
+    128 +                                                                                                                                                                                                                                                 
+    129 +    try:                                                                                                                                                                                                                                         
+    130 +        resp = requests.get(health_url, timeout=5)                                                                                                                                                                                               
+    131 +        print(f"- Health      : HTTP {resp.status_code}")                                                                                                                                                                                        
+    132 +    except Exception as e:                                                                                                                                                                                                                       
+    133 +        print(f"- Health      : error ({e})")                                                                                                                                                                                                    
+    134 +                                                                                                                                                                                                                                                 
+    135 +                                                                                                                                                                                                                                                 
+    136 +def cmd_search_docs(args: argparse.Namespace) -> None:                                                                                                                                                                                           
+    137 +    """Search docs/ for files whose names contain the query."""                                                                                                                                                                                  
+    138 +    query = args.query.lower()                                                                                                                                                                                                                   
+    139 +    docs_dir = BASE_DIR / "docs"                                                                                                                                                                                                                 
+    140 +    if not docs_dir.exists():                                                                                                                                                                                                                    
+    141 +        print("[cli] docs/ directory not found.")                                                                                                                                                                                                
+    142 +        return                                                                                                                                                                                                                                   
+    143 +                                                                                                                                                                                                                                                 
+    144 +    matches: List[Path] = []                                                                                                                                                                                                                     
+    145 +    for path in docs_dir.rglob("*.md"):                                                                                                                                                                                                          
+    146 +        if query in path.name.lower():                                                                                                                                                                                                           
+    147 +            matches.append(path.relative_to(BASE_DIR))                                                                                                                                                                                           
+    148 +                                                                                                                                                                                                                                                 
+    149 +    if not matches:                                                                                                                                                                                                                              
+    150 +        print(f"[cli] No docs matched '{args.query}'.")                                                                                                                                                                                          
+    151 +        return                                                                                                                                                                                                                                   
+    152 +                                                                                                                                                                                                                                                 
+    153 +    print(f"[cli] Docs matching '{args.query}':")                                                                                                                                                                                                
+    154 +    for m in matches:                                                                                                                                                                                                                            
+    155 +        print(f"- {m}")                                                                                                                                                                                                                          
+    156 +                                                                                                                                                                                                                                                 
+    157 +                                                                                                                                                                                                                                                 
+    158 +def cmd_interactive(_: argparse.Namespace | None = None) -> None:                                                                                                                                                                                
+    159 +    """Interactive REPL-style CLI."""                                                                                                                                                                                                            
+    160 +    print("PMOVES-BoTZ CLI (mini-agent city)")                                                                                                                                                                                                   
+    161 +    print("Type 'help' for commands, 'quit' to exit.\n")                                                                                                                                                                                         
+    162 +                                                                                                                                                                                                                                                 
+    163 +    while True:                                                                                                                                                                                                                                  
+    164 +        try:                                                                                                                                                                                                                                     
+    165 +            line = input("pmoves> ").strip()                                                                                                                                                                                                     
+    166 +        except (EOFError, KeyboardInterrupt):                                                                                                                                                                                                    
+    167 +            print()                                                                                                                                                                                                                              
+    168 +            break                                                                                                                                                                                                                                
+    169 +                                                                                                                                                                                                                                                 
+    170 +        if not line:                                                                                                                                                                                                                             
+    171 +            continue                                                                                                                                                                                                                             
+    172 +                                                                                                                                                                                                                                                 
+    173 +        if line in ("quit", "exit"):                                                                                                                                                                                                             
+    174 +            break                                                                                                                                                                                                                                
+    175 +                                                                                                                                                                                                                                                 
+    176 +        if line in ("help", "?"):                                                                                                                                                                                                                
+    177 +            print("Commands:")                                                                                                                                                                                                                   
+    178 +            print("  status             - show stack status")                                                                                                                                                                                    
+    179 +            print("  agents             - list mini agents")                                                                                                                                                                                     
+    180 +            print("  agent <name>       - show details for an agent")                                                                                                                                                                            
+    181 +            print("  docs <query>       - search docs/ by filename")                                                                                                                                                                             
+    182 +            print("  quit/exit          - leave the CLI")                                                                                                                                                                                        
+    183 +            continue                                                                                                                                                                                                                             
+    184 +                                                                                                                                                                                                                                                 
+    185 +        parts = line.split()                                                                                                                                                                                                                     
+    186 +        cmd = parts[0]                                                                                                                                                                                                                           
+    187 +        args = parts[1:]                                                                                                                                                                                                                         
+    188 +                                                                                                                                                                                                                                                 
+    189 +        if cmd == "status":                                                                                                                                                                                                                      
+    190 +            cmd_status(argparse.Namespace())                                                                                                                                                                                                     
+    191 +        elif cmd == "agents":                                                                                                                                                                                                                    
+    192 +            cmd_list_agents(argparse.Namespace())                                                                                                                                                                                                
+    193 +        elif cmd == "agent":                                                                                                                                                                                                                     
+    194 +            if not args:                                                                                                                                                                                                                         
+    195 +                print("[cli] Usage: agent <name>")                                                                                                                                                                                               
+    196 +            else:                                                                                                                                                                                                                                
+    197 +                cmd_agent_info(argparse.Namespace(name=args[0]))                                                                                                                                                                                 
+    198 +        elif cmd == "docs":                                                                                                                                                                                                                      
+    199 +            if not args:                                                                                                                                                                                                                         
+    200 +                print("[cli] Usage: docs <query>")                                                                                                                                                                                               
+    201 +            else:                                                                                                                                                                                                                                
+    202 +                cmd_search_docs(argparse.Namespace(query=" ".join(args)))                                                                                                                                                                        
+    203 +        else:                                                                                                                                                                                                                                    
+    204 +            print(f"[cli] Unknown command '{cmd}'. Type 'help' for options.")                                                                                                                                                                    
+    205 +                                                                                                                                                                                                                                                 
+    206 +                                                                                                                                                                                                                                                 
+    207 +def build_parser() -> argparse.ArgumentParser:                                                                                                                                                                                                   
+    208 +    parser = argparse.ArgumentParser(                                                                                                                                                                                                            
+    209 +        description="PMOVES-BoTZ CLI for coordinating mini agents.",                                                                                                                                                                             
+    210 +    )                                                                                                                                                                                                                                            
+    211 +    sub = parser.add_subparsers(dest="command")                                                                                                                                                                                                  
+    212 +                                                                                                                                                                                                                                                 
+    213 +    sub.add_parser("status", help="Show PMOVES-BoTZ status").set_defaults(func=cmd_status)                                                                                                                                                       
+    214 +    sub.add_parser("list-agents", help="List mini agents").set_defaults(func=cmd_list_agents)                                                                                                                                                    
+    215 +                                                                                                                                                                                                                                                 
+    216 +    agent_parser = sub.add_parser("agent", help="Show details for a specific agent")                                                                                                                                                             
+    217 +    agent_parser.add_argument("name", help="Agent key (e.g. cipher, docling, gateway, yt-mini)")                                                                                                                                                 
+    218 +    agent_parser.set_defaults(func=cmd_agent_info)                                                                                                                                                                                               
+    219 +                                                                                                                                                                                                                                                 
+    220 +    docs_parser = sub.add_parser("search-docs", help="Search docs/ by filename")                                                                                                                                                                 
+    221 +    docs_parser.add_argument("query", help="Search term")                                                                                                                                                                                        
+    222 +    docs_parser.set_defaults(func=cmd_search_docs)                                                                                                                                                                                               
+    223 +                                                                                                                                                                                                                                                 
+    224 +    sub.add_parser("interactive", help="Run interactive REPL").set_defaults(func=cmd_interactive)                                                                                                                                                
+    225 +                                                                                                                                                                                                                                                 
+    226 +    return parser                                                                                                                                                                                                                                
+    227 +                                                                                                                                                                                                                                                 
+    228 +                                                                                                                                                                                                                                                 
+    229 +def main(argv: List[str] | None = None) -> None:                                                                                                                                                                                                 
+    230 +    parser = build_parser()                                                                                                                                                                                                                      
+    231 +    args = parser.parse_args(argv)
+    232 +                                                                                                                                                                                                                                                 
+    233 +    if not getattr(args, "command", None):                                                                                                                                                                                                       
+    234 +        # No subcommand: drop into interactive mode.                                                                                                                                                                                             
+    235 +        cmd_interactive()                                                                                                                                                                                                                        
+    236 +        return                                                                                                                                                                                                                                   
+    237 +                                                                                                                                                                                                                                                 
+    238 +    func = getattr(args, "func", None)                                                                                                                                                                                                           
+    239 +    if func is None:                                                                                                                                                                                                                             
+    240 +        parser.print_help()                                                                                                                                                                                                                      
+    241 +        sys.exit(1)                                                                                                                                                                                                                              
+    242 +                                                                                                                                                                                                                                                 
+    243 +    func(args)                                                                                                                                                                                                                                   
+    244 +                                                                                                                                                                                                                                                 
+    245 +                                                                                                                                                                                                                                                 
+    246 +if __name__ == "__main__":                                                                                                                                                                                                                       
+    247 +    main()                                                                                                                                                                                                                                       
+    248 +                                                                                                                                                                                                                                                 
+                                                                                                                                                                                                                                                          
+• Edited README.md (+22 -2)                                                                                                                                                                                                                               
+    60     - Cipher Memory runs on ports 3010 (UI) and 3011 (API) when enabled via Pro pack compose.
+    61 -   - Prefer the new PMOVES‑BotZ gateway proxy by adding `-f features/gateway-proxy/docker-compose.yml` to the compose command.                                                                                                                    
+    62 -                                                                                                                                                                                                                                                  
+    61 +   - Prefer the new PMOVES-BotZ gateway proxy by adding `-f features/gateway-proxy/docker-compose.yml` to the compose command.                                                                                                                    
+    62 +                                                                                                                                                                                                                                                  
+    63  For detailed setup instructions, see [Cipher Memory Integration Guide](docs/CIPHER_MEMORY_INTEGRATION.md).                                                                                                                                        
+    64 +                                                                                                                                                                                                                                                  
+    65 +## Mini-Agent CLI (Experimental)                                                                                                                                                                                                                  
+    66 +                                                                                                                                                                                                                                                  
+    67 +PMOVES-BoTZ includes an experimental CLI that treats core services as a small team of “mini agents” and provides helpers for exploration and health checks.                                                                                       
+    68 +                                                                                                                                                                                                                                                  
+    69 +- Run interactively:                                                                                                                                                                                                                              
+    70 +  ```bash                                                                                                                                                                                                                                         
+    71 +  python scripts/pmoves_cli.py                                                                                                                                                                                                                    
+    72 +  ```                                                                                                                                                                                                                                             
+    73 +  Commands include:                                                                                                                                                                                                                               
+    74 +  - `status` – shows stack status using the existing `pmoves_status` script.                                                                                                                                                                      
+    75 +  - `agents` – lists known mini agents (gateway, docling, cipher, VL-sentinel, planned yt-mini).                                                                                                                                                  
+    76 +  - `agent <name>` – shows details and health for a specific agent.                                                                                                                                                                               
+    77 +  - `docs <query>` – searches `docs/` for matching filenames.                                                                                                                                                                                     
+    78 +                                                                                                                                                                                                                                                  
+    79 +- Run a single command:                                                                                                                                                                                                                           
+    80 +  ```bash                                                                                                                                                                                                                                         
+    81 +  python scripts/pmoves_cli.py list-agents                                                                                                                                                                                                        
+    82 +  python scripts/pmoves_cli.py agent cipher                                                                                                                                                                                                       
+    83 +  ```                                                                                                                                                                                                                                             
+                                                                                                                                                                                                                                                          
+─ Worked for 1m 09s ──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+• I’ve scaffolded the CLI layer and documented how it fits into the “mini-agent city” concept.
+                                                                                                                                                                                                                                                          
+  1. New PMOVES-BoTZ CLI (mini-agent layer)                                                                                                                                                                                                               
+                                                                                                                                                                                                                                                          
+  - Script added: scripts/pmoves_cli.py                                                                                                                                                                                                                   
+      - Written in Python, uses existing stack scripts and HTTP health endpoints.                                                                                                                                                                         
+      - Treats core services as named mini agents:                                                                                                                                                                                                        
+          - gateway – MCP gateway / big-bro orchestrator.                                                                                                                                                                                                 
+          - docling – document MCP server.                                                                                                                                                                                                                
+          - cipher – memory-powered API (UI/API on 3010/3011).                                                                                                                                                                                            
+          - vl – VL-Sentinel (Ollama/VL).                                                                                                                                                                                                                 
+          - yt-mini – planned YT mini agent (for future features/yt overlay).                                                                                                                                                                             
+      - Uses the following per-agent metadata:                                                                                                                                                                                                            
+          - A short description.                                                                                                                                                                                                                          
+          - Health URL template (with env-driven port).                                                                                                                                                                                                   
+          - Port env var + default.                                                                                                                                                                                                                       
+  - Commands (non-interactive mode)                                                                                                                                                                                                                       
+                                                                                                                                                                                                                                                          
+    From repo root:                                                                                                                                                                                                                                       
+                                                                                                                                                                                                                                                          
+    # General help                                                                                                                                                                                                                                        
+    python scripts/pmoves_cli.py -h                                                                                                                                                                                                                       
+                                                                                                                                                                                                                                                          
+    # Show stack status via pmoves_status.(ps1|sh)                                                                                                                                                                                                        
+    python scripts/pmoves_cli.py status                                                                                                                                                                                                                   
+                                                                                                                                                                                                                                                          
+    # List mini agents (gateway, docling, cipher, vl, yt-mini)                                                                                                                                                                                            
+    python scripts/pmoves_cli.py list-agents                                                                                                                                                                                                              
+                                                                                                                                                                                                                                                          
+    # Show details + health for a specific agent                                                                                                                                                                                                          
+    python scripts/pmoves_cli.py agent cipher                                                                                                                                                                                                             
+    python scripts/pmoves_cli.py agent gateway                                                                                                                                                                                                            
+                                                                                                                                                                                                                                                          
+    # Search docs/ by filename                                                                                                                                                                                                                            
+    python scripts/pmoves_cli.py search-docs cipher                                                                                                                                                                                                       
+                                                                                                                                                                                                                                                          
+    Behaviors:                                                                                                                                                                                                                                            
+      - status:                                                                                                                                                                                                                                           
+          - On Windows: runs scripts/pmoves_status.ps1 via pwsh.                                                                                                                                                                                          
+          - On Unix: runs scripts/pmoves_status.sh via bash.                                                                                                                                                                                              
+      - agent <name>:                                                                                                                                                                                                                                     
+          - Resolves the port from the appropriate env var or default (e.g. CIPHER_API_PORT or 3011).                                                                                                                                                     
+          - Calls the agent’s /health endpoint with requests.                                                                                                                                                                                             
+          - Prints the HTTP status or error.                                                                                                                                                                                                              
+      - search-docs <query>:                                                                                                                                                                                                                              
+          - Walks docs/ and lists .md files whose names contain the query.                                                                                                                                                                                
+  - Interactive REPL mode                                                                                                                                                                                                                                 
+                                                                                                                                                                                                                                                          
+    If you run:                                                                                                                                                                                                                                           
+                                                                                                                                                                                                                                                          
+
+    You drop into:
+      - Prompt: pmoves>
+      - Commands:
+          - agent <name>
+          - docs <query>
+          - help
+          - quit / exit
+
+    This is the beginnings of the “city” of CLI helpers: an interactive place where Cipher and the other mini agents are visible, and you can quickly check their status and find relevant docs.
+
+  2. Readme docs for the CLI
+
+  - Updated README.md with a “Mini-Agent CLI (Experimental)” section:
+      - Explains that this CLI treats core services as a small team of mini agents.
+      - Shows how to:
+          - Run interactive: python scripts/pmoves_cli.py
+          - Use key commands: status, agents, agent <name>, docs <query>.
+          - Run single commands directly, like list-agents and agent cipher.
+
+  This is intentionally light and safe: it doesn’t mutate data or start/stop services yet; it just gives an interactive, agent-centric view of the stack and documentation. It fits with the layered design you described:
+
+  - CLI mini agents as the “city streets” the user walks.
+  - Big-bro agents (gateway/orchestrator) coordinating the mini agents.
+  - Cipher as the first “front door” agent visible in the CLI.
+
+  If you’d like, next we can extend this CLI so Cipher can:
+
+  - Offer choices about LLM backend (Ollama vs cloud) by inspecting env vars.
+  - Run a small “self-check” flow that calls the Cipher /health, /api/sessions, and a test /api/message/sync and explains the results to the user in plain language.
+
+
+› yes to next steps  want the user to be presented with options id prefer the default to be local ollama has local and cloud cloudflare has cloud flare workers this will be integrated with PMOVES.AI which uses tensorzero to provide other providers   
+  and models
+
+                                                                                                                                                                                                                                                          
+• Edited scripts\pmoves_cli.py (+75 -1)                                                                                                                                                                                                                   
+    157                                                                                                                                                                                                                                                   
+    158 +def cmd_llm_options(_: argparse.Namespace) -> None:                                                                                                                                                                                              
+    159 +    """Show detected LLM backend options (local and cloud) and guidance."""                                                                                                                                                                      
+    160 +    print("LLM backend options for PMOVES-BoTZ\n")                                                                                                                                                                                               
+    161 +                                                                                                                                                                                                                                                 
+    162 +    # 1) Local Ollama (default preference)                                                                                                                                                                                                       
+    163 +    ollama_base = os.getenv("OLLAMA_BASE_URL") or "http://host.docker.internal:11434"                                                                                                                                                            
+    164 +    ollama_status = "unknown"                                                                                                                                                                                                                    
+    165 +    try:                                                                                                                                                                                                                                         
+    166 +        resp = requests.get(f"{ollama_base}/api/tags", timeout=2)                                                                                                                                                                                
+    167 +        if resp.status_code == 200:                                                                                                                                                                                                              
+    168 +            ollama_status = "reachable"                                                                                                                                                                                                          
+    169 +        else:                                                                                                                                                                                                                                    
+    170 +            ollama_status = f"HTTP {resp.status_code}"                                                                                                                                                                                           
+    171 +    except Exception:                                                                                                                                                                                                                            
+    172 +        ollama_status = "not reachable"                                                                                                                                                                                                          
+    173 +                                                                                                                                                                                                                                                 
+    174 +    print("1) Local Ollama (preferred default)")                                                                                                                                                                                                 
+    175 +    print(f"   - Base URL : {ollama_base}")                                                                                                                                                                                                      
+    176 +    print(f"   - Status   : {ollama_status}")                                                                                                                                                                                                    
+    177 +    print("   - Notes    :")                                                                                                                                                                                                                     
+    178 +    print("       * Runs fully local models (no cloud key needed).")                                                                                                                                                                             
+    179 +    print("       * Recommended to pull at least one model, e.g.:")                                                                                                                                                                              
+    180 +    print("         - `ollama pull qwen2.5-vl:14b` (for VL-Sentinel)")                                                                                                                                                                           
+    181 +    print("         - `ollama pull qwen2.5:7b` or similar for text agents")                                                                                                                                                                      
+    182 +    print()                                                                                                                                                                                                                                      
+    183 +                                                                                                                                                                                                                                                 
+    184 +    # 2) Cipher cloud (Venice / OpenAI)                                                                                                                                                                                                          
+    185 +    venice_key = os.getenv("VENICE_API_KEY")                                                                                                                                                                                                     
+    186 +    openai_key = os.getenv("OPENAI_API_KEY")                                                                                                                                                                                                     
+    187 +    has_cipher_cloud = False                                                                                                                                                                                                                     
+    188 +    if venice_key and venice_key != "test_key_placeholder" and len(venice_key) > 10:                                                                                                                                                             
+    189 +        has_cipher_cloud = True                                                                                                                                                                                                                  
+    190 +        cipher_status = "VENICE_API_KEY detected"                                                                                                                                                                                                
+    191 +    elif openai_key and openai_key != "test_key_placeholder" and openai_key.startswith("sk-"):                                                                                                                                                   
+    192 +        has_cipher_cloud = True                                                                                                                                                                                                                  
+    193 +        cipher_status = "OPENAI_API_KEY detected"                                                                                                                                                                                                
+    194 +    else:                                                                                                                                                                                                                                        
+    195 +        cipher_status = "no valid VENICE_API_KEY or OPENAI_API_KEY found"                                                                                                                                                                        
+    196 +                                                                                                                                                                                                                                                 
+    197 +    print("2) Cipher cloud (Venice / OpenAI via Cipher)")                                                                                                                                                                                        
+    198 +    print(f"   - Status   : {cipher_status}")                                                                                                                                                                                                    
+    199 +    print("   - Notes    :")
+    200 +    print("       * Cipher uses these keys for LLM + embeddings.")                                                                                                                                                                               
+    201 +    print("       * Configure in `.env` for the BoTZ stack, e.g.:")                                                                                                                                                                              
+    202 +    print("           VENICE_API_KEY=your-venice-key")                                                                                                                                                                                           
+    203 +    print("         or")                                                                                                                                                                                                                         
+    204 +    print("           OPENAI_API_KEY=sk-your-openai-key")                                                                                                                                                                                        
+    205 +    print("       * Smoke tests will treat upstream auth errors as informational only.")                                                                                                                                                         
+    206 +    print()                                                                                                                                                                                                                                      
+    207 +                                                                                                                                                                                                                                                 
+    208 +    # 3) PMOVES.AI / TensorZero gateway (future cross-provider router)                                                                                                                                                                           
+    209 +    tz_url = os.getenv("TENSORZERO_GATEWAY_URL") or os.getenv("TENSORZERO_URL")                                                                                                                                                                  
+    210 +    tz_status = tz_url or "not configured"                                                                                                                                                                                                       
+    211 +                                                                                                                                                                                                                                                 
+    212 +    print("3) PMOVES.AI / TensorZero (future multi-provider gateway)")                                                                                                                                                                           
+    213 +    print(f"   - URL      : {tz_status}")                                                                                                                                                                                                        
+    214 +    print("   - Notes    :")                                                                                                                                                                                                                     
+    217 +    print("         an additional LLM routing option for the agents.")
+    218 +    print()
+    219 +
+    220 +    print("Guidance:")
+    221 +    print("  - Default flow: prefer local Ollama; ensure an Ollama model is pulled.")
+    222 +    print("  - For cloud: set VENICE_API_KEY / OPENAI_API_KEY in `.env` and restart the stack.")
+    223 +    print("  - For PMOVES.AI/TensorZero: set TENSORZERO_GATEWAY_URL when that integration lands.")
+    224 +
+    225 +
+    226  def cmd_interactive(_: argparse.Namespace | None = None) -> None:
+        ⋮
+    249              print("  docs <query>       - search docs/ by filename")
+    250 +            print("  llm                - show LLM backend options (local/cloud)")
+    251              print("  quit/exit          - leave the CLI")
+        ⋮
+    271                  cmd_search_docs(argparse.Namespace(query=" ".join(args)))
+    272 +        elif cmd == "llm":
+    273 +            cmd_llm_options(argparse.Namespace())
+    274          else:
+        ⋮
+    294
+    295 +    sub.add_parser("llm-options", help="Show LLM backend options (local/cloud/TensorZero)").set_defaults(
+    296 +        func=cmd_llm_options
+    297 +    )
+    298 +
+    299      sub.add_parser("interactive", help="Run interactive REPL").set_defaults(func=cmd_interactive)
+        ⋮
+    322      main()
+    248 -
+
+• Ran pwsh.exe -Command 'python scripts/pmoves_cli.py llm-options'
+  └ LLM backend options for PMOVES-BoTZ                                                                                                                                                                                                                   
+                                                                                                                                                                                                                                                          
+    … +28 lines                                                                                                                                                                                                                                           
+      - For cloud: set VENICE_API_KEY / OPENAI_API_KEY in `.env` and restart the stack.                                                                                                                                                                   
+      - For PMOVES.AI/TensorZero: set TENSORZERO_GATEWAY_URL when that integration lands.                                                                                                                                                                 
+                                                                                                                                                                                                                                                          
+• Edited README.md (+2 -0)                                                                                                                                                                                                                                
+    77    - `docs <query>` – searches `docs/` for matching filenames.                                                                                                                                                                                     
+    78 +   - `llm` – shows detected LLM backend options (local Ollama, Cipher cloud, future TensorZero).                                                                                                                                                  
+    79                                                                                                                                                                                                                                                    
+       ⋮                                                                                                                                                                                                                                                  
+    83    python scripts/pmoves_cli.py agent cipher                                                                                                                                                                                                       
+    84 +   python scripts/pmoves_cli.py llm-options                                                                                                                                                                                                       
+    85    ```                                                                                                                                                                                                                                             
+                                                                                                                                                                                                                                                          
+─ Worked for 1m 03s ──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+• The CLI now presents LLM backend options with a local‑first default, and it’s wired into the docs.
+                                                                                                                                                                                                                                                          
+  1. LLM options in the CLI                                                                                                                                                                                                                               
+                                                                                                                                                                                                                                                          
+  In scripts/pmoves_cli.py I added:                                                                                                                                                                                                                       
+                                                                                                                                                                                                                                                          
+  - New command (non‑interactive):                                                                                                                                                                                                                        
+                                                                                                                                                                                                                                                          
+    python scripts/pmoves_cli.py llm-options                                                                                                                                                                                                              
+  - Interactive shortcut:                                                                                                                                                                                                                                 
+      - From the REPL (python scripts/pmoves_cli.py), you can type:                                                                                                                                                                                       
+          - llm → shows the same options.                                                                                                                                                                                                                 
+                                                                                                                                                                                                                                                          
+  What it does:                                                                                                                                                                                                                                           
+                                                                                                                                                                                                                                                          
+  - 1) Local Ollama (preferred default)                                                                                                                                                                                                                   
+      - Detects OLLAMA_BASE_URL or falls back to http://host.docker.internal:11434.                                                                                                                                                                       
+      - Tries a quick GET <base>/api/tags:                                                                                                                                                                                                                
+          - If 200 → Status: reachable                                                                                                                                                                                                                    
+          - Else → Status: HTTP <code> or not reachable                                                                                                                                                                                                   
+      - Prints guidance:                                                                                                                                                                                                                                  
+          - Runs fully local; no cloud key needed.                                                                                                                                                                                                        
+          - Suggests pulling at least:                                                                                                                                                                                                                    
+              - ollama pull qwen2.5-vl:14b (for VL-Sentinel)                                                                                                                                                                                              
+              - ollama pull qwen2.5:7b (or similar) for text agents.                                                                                                                                                                                      
+  - 2) Cipher cloud (Venice / OpenAI via Cipher)                                                                                                                                                                                                          
+      - Looks at VENICE_API_KEY and OPENAI_API_KEY:                                                                                                                                                                                                       
+          - If a non-placeholder key is found:                                                                                                                                                                                                            
+              - Status like VENICE_API_KEY detected or OPENAI_API_KEY detected.                                                                                                                                                                           
+          - Otherwise:                                                                                                                                                                                                                                    
+              - Status: no valid VENICE_API_KEY or OPENAI_API_KEY found.                                                                                                                                                                                  
+      - Prints guidance:                                                                                                                                                                                                                                  
+          - Set keys in .env for this stack:                                                                                                                                                                                                              
+              - VENICE_API_KEY=your-venice-key or                                                                                                                                                                                                         
+              - OPENAI_API_KEY=sk-your-openai-key                                                                                                                                                                                                         
+          - Notes that smoke tests treat upstream auth errors as informational only, so routing can still be validated even if the key is wrong.                                                                                                          
+  - 3) PMOVES.AI / TensorZero (future multi-provider gateway)                                                                                                                                                                                             
+      - Looks for TENSORZERO_GATEWAY_URL or TENSORZERO_URL:                                                                                                                                                                                               
+          - If set → prints the URL.                                                                                                                                                                                                                      
+          - Else → URL: not configured.                                                                                                                                                                                                                   
+
+  2. CLI docs updated
+
+  In README.md under Mini-Agent CLI (Experimental):
+
+  - And llm-options to the single-command examples:
+
+    python scripts/pmoves_cli.py list-agents
+    python scripts/pmoves_cli.py agent cipher
+    python scripts/pmoves_cli.py llm-options
+
+  So a typical flow for a user is now:
+
+  1. Start the stack (./scripts/bring_up_pmoves_botz.(ps1|sh)).
+  2. Run python scripts/pmoves_cli.py:
+      - agents to see the team (gateway, docling, cipher, vl, yt-mini).
+      - agent cipher to inspect Cipher.
+      - llm to choose how they want models to be wired (local vs cloud vs future PMOVES.AI/TensorZero).
+
+  If you’d like, the next incremental step would be:
+
+  - Have agent cipher also summarize LLM status inline (using the same detection logic as llm-options), so the user sees Cipher + LLM capabilities together when they inspect that agent.
+
+
+› yes cipher is mcp and a2a has cool descriptions allow cipher but one thing to clarify. the cli bots are provider native this way we can fully leverage their respective sdks and apis their fist mission once all green is to catalog themselves        
+  chipher and when we fold them in the will run alongside the super PMOVES-DoX docs\PMOVES_Git_Organz.txt has a list for the the ARC like in transformers all the agents their tools the services and when combined they are POWERFULMOVES!
+
+
+• Ran pwsh.exe -Command 'Get-Content docs/PMOVES_Git_Organz.txt -TotalCount 260'
+  └ # NOTE: This file has been organized into comprehensive markdown documentation
+    # See the following files for the organized version:
+    … +142 lines
+    wdrolle
+
+
+• Ran pwsh.exe -Command 'Get-Content docs/PMOVES_Git_Organization.md -TotalCount 260'
+  └ # PMOVES Git Organization & Infrastructure Guide                                                                                                                                                                                                      
+                                                                                                                                                                                                                                                          
+    … +180 lines                                                                                                                                                                                                                                          
+    - Regular updates should be made as new repositories are added or configurations change                                                                                                                                                               
+    - Team members should ensure they have appropriate access to the repositories mentioned above                                                                                                                                                         
+                                                                                                                                                                                                                                                          
+• Edited PMOVES_Edition.md (+6 -1)                                                                                                                                                                                                                        
+    104      - Access to MCP tools and other stack services.                                                                                                                                                                                              
+    105 +    - A **provider-native** implementation that leverages that provider's SDKs/APIs directly (e.g., Cipher’s Node/HTTP APIs, YT’s media tooling, Archon’s cloud runners).                                                                        
+    106    - These CLIs are the "mini agents" of the team, focused on a specific domain (documents, memory, media, etc.).                                                                                                                                 
+    107 +  - Once all core services are green, the first mission of the CLI layer is to **self-catalog**:                                                                                                                                                 
+    108 +    - Identify and describe each mini agent and its tools.                                                                                                                                                                                       
+    109 +    - Capture Cipher’s MCP/A2A metadata (e.g., `/.well-known/agent.json`) and other agent descriptors.                                                                                                                                           
+    110 +    - Feed this catalog into the documentation/knowledge layer (PMOVES-DoX and related repos).                                                                                                                                                   
+    111                                                                                                                                                                                                                                                   
+        ⋮                                                                                                                                                                                                                                                 
+    121                                                                                                                                                                                                                                                   
+    117 -This layered model keeps each feature self-contained (with its own CLI and tests) while allowing PMOVES-BoTZ to operate as a coordinated team of agents through the gateway and MCP modes.                                                       
+    122 +This layered model keeps each feature self-contained (with its own provider-native CLI and tests) while allowing PMOVES-BoTZ to operate as a coordinated team of agents through the gateway and MCP modes, and to publish a unified catalog of ag
+         ents/tools into PMOVES-DoX.                                                                                                                                                                                                                      
+                                                                                                                                                                                                                                                          
+• Edited docs\PMOVES_Git_Organization.md (+26 -15)                                                                                                                                                                                                        
+    105                                                                                                                                                                                                                                                   
+    106 -### Tools & Utilities                                                                                                                                                                                                                            
+    107 -| Repository | Description |                                                                                                                                                                                                                     
+    108 -|------------|-------------|                                                                                                                                                                                                                     
+    109 -| [PMOVES-Open-Notebook](https://github.com/POWERFULMOVES/PMOVES-Open-Notebook.git) | Notebook and documentation system |                                                                                                                        
+    110 -| [Pmoves-Health-wger](https://github.com/POWERFULMOVES/Pmoves-Health-wger.git) | Health and fitness integration |                                                                                                                               
+    111 -| [PMOVES-Wealth](https://github.com/POWERFULMOVES/PMOVES-Wealth.git) | Financial management tools |                                                                                                                                             
+    112 -| [PMOVES-ToKenism-Multi](https://github.com/POWERFULMOVES/PMOVES-ToKenism-Multi.git) | Multi-token management system |                                                                                                                          
+    113 -| [PMOVES-DoX](https://github.com/POWERFULMOVES/PMOVES-DoX.git) | Documentation and knowledge management |                                                                                                                                       
+    106 +### Tools & Utilities                                                                                                                                                                                                                            
+    107 +| Repository | Description |                                                                                                                                                                                                                     
+    108 +|------------|-------------|                                                                                                                                                                                                                     
+    109 +| [PMOVES-Open-Notebook](https://github.com/POWERFULMOVES/PMOVES-Open-Notebook.git) | Notebook and documentation system |                                                                                                                        
+    110 +| [Pmoves-Health-wger](https://github.com/POWERFULMOVES/Pmoves-Health-wger.git) | Health and fitness integration |                                                                                                                               
+    111 +| [PMOVES-Wealth](https://github.com/POWERFULMOVES/PMOVES-Wealth.git) | Financial management tools |                                                                                                                                             
+    112 +| [PMOVES-ToKenism-Multi](https://github.com/POWERFULMOVES/PMOVES-ToKenism-Multi.git) | Multi-token management system |                                                                                                                          
+    113 +| [PMOVES-DoX](https://github.com/POWERFULMOVES/PMOVES-DoX.git) | Documentation and knowledge management |                                                                                                                                       
+    114                                                                                                                                                                                                                                                   
+        ⋮                                                                                                                                                                                                                                                 
+    122                                                                                                                                                                                                                                                   
+    124 
+        ⋮
+    172 
+    173 -## Additional Resources
+    173 +## Additional Resources
+    174 
+        ⋮
+    179 
+    180 -## Notes
+    181 -
+    182 -- This document serves as a central reference for PMOVES.AI's GitHub organization and infrastructure
+    183 -- Regular updates should be made as new repositories are added or configurations change
+    184 -- Team members should ensure they have appropriate access to the repositories mentioned above
+    180 +## Notes
+    181 +
+    182 +- This document serves as a central reference for PMOVES.AI's GitHub organization and infrastructure
+    183 +- Regular updates should be made as new repositories are added or configurations change
+    184 +- Team members should ensure they have appropriate access to the repositories mentioned above
+    185 +
+    186 +### Mini-Agent ARC & Provider-Native CLIs
+    187 +
+    188 +- Many of the repositories above are designed to act as **provider-native mini agents**:
+    189 +  - Each repo owns its own CLI, SDK usage, and provider integration (e.g., Archon for cloud runners, PMOVES.YT for media, PMOVES-DoX for documentation).
+    190 +  - When integrated into PMOVES-BoTZ, these CLIs become part of the "mini-agent city" layer and can bootstrap or manage the services they represent.
+    191 +- Within the BoTZ stack:
+    192 +  - Cipher exposes MCP and A2A metadata (such as `/.well-known/agent.json`), and other agents will follow similar patterns.
+    193 +  - The initial mission of the CLI agents, once core services and smoke tests are green, is to **catalog themselves and their capabilities**:
+    194 +    - Enumerate agents, tools, and health endpoints.
+    195 +    - Publish this catalog into PMOVES-DoX and related documentation so the full ARC of agents, tools, and services can be discovered and composed.
+                                                                                                                                                                                                                                                          
+• Edited scripts\pmoves_cli.py (+6 -6)                                                                                                                                                                                                                    
+     6  mini-agent stack from the terminal. It treats core services (Cipher, Docling,                                                                                                                                                                     
+     7 -VL-Sentinel, future YT mini, etc.) as a small "team" of agents and provides                                                                                                                                                                       
+     8 -simple helpers to:                                                                                                                                                                                                                                
+     7 +VL-Sentinel, future YT mini, etc.) as a small "team" of provider-native agents                                                                                                                                                                    
+     8 +and provides simple helpers to:                                                                                                                                                                                                                   
+     9                                                                                                                                                                                                                                                    
+    10 -- Inspect agent roles and endpoints.                                                                                                                                                                                                              
+    11 -- Run basic health/status checks.                                                                                                                                                                                                                 
+    10 +- Inspect agent roles, health, and MCP/A2A surfaces (e.g., Cipher’s /.well-known/agent.json).                                                                                                                                                     
+    11 +- Run basic health/status checks against local and cloud-backed services.                                                                                                                                                                         
+    12  - Discover relevant documentation in the repo.                                                                                                                                                                                                    
+    13                                                                                                                                                                                                                                                    
+    14 -This is intentionally minimal and safe: it never mutates data, it just calls                                                                                                                                                                      
+    15 -existing scripts and HTTP health endpoints.                                                                                                                                                                                                       
+    14 +This CLI does not mutate data or configuration; it is intentionally read-only                                                                                                                                                                     
+    15 +and relies on existing scripts, HTTP endpoints, and environment variables.                                                                                                                                                                        
+    16  """                                                                                                                                                                                                                                               
+                                                                                                                                                                                                                                                          
+─ Worked for 1m 26s ──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+• I’ve encoded your clarifications into the docs and CLI so the “mini-agent city” concept—and Cipher’s role in it—is clear and aligned with the broader PMOVES.AI ecosystem.                                                                              
+                                                                                                                                                                                                                                                          
+  1. Provider‑native CLI mini agents & self‑catalog mission                                                                                                                                                                                               
+                                                                                                                                                                                                                                                          
+  - PMOVES_Edition.md                                                                                                                                                                                                                                     
+                                                                                                                                                                                                                                                          
+    In the “Team of Mini Agents” section I added:                                                                                                                                                                                                         
+      - Each feature’s CLI is explicitly described as provider-native:                                                                                                                                                                                    
+          - Cipher: Node/HTTP + its own MCP/A2A surfaces.                                                                                                                                                                                                 
+          - YT mini: media tooling, yt-dlp, etc.                                                                                                                                                                                                          
+          - Archon, others: their own SDKs/APIs.                                                                                                                                                                                                          
+      - Their first mission once everything is green is to self‑catalog:                                                                                                                                                                                  
+          - Enumerate each mini agent and its tools.                                                                                                                                                                                                      
+          - Capture Cipher’s MCP/A2A metadata (e.g. /.well-known/agent.json) and similar descriptors from other agents.                                                                                                                                   
+          - Feed that into the documentation/knowledge layer (PMOVES‑DoX and friends).                                                                                                                                                                    
+      - The text explicitly says the unified catalog gets published into PMOVES‑DoX so the whole ARC of agents/tools/services is discoverable.                                                                                                            
+  - docs/PMOVES_Git_Organization.md                                                                                                                                                                                                                       
+                                                                                                                                                                                                                                                          
+    Added a new subsection:                                                                                                                                                                                                                               
+      - “Mini-Agent ARC & Provider-Native CLIs”, which explains:                                                                                                                                                                                          
+          - Many repos listed (Archon, Agent Zero, PMOVES.YT, PMOVES‑DoX, etc.) are intended to act as provider‑native mini agents with their own CLIs and SDK integrations.                                                                              
+          - In the BoTZ stack:
+              - Cipher exposes MCP and A2A metadata (e.g. /.well-known/agent.json).
+              - Other agents are expected to follow similar patterns.
+          - Once core services + smokes are green, the CLI agents will:
+              - Catalog themselves, their tools, and health endpoints.
+              - Publish that catalog into PMOVES‑DoX, giving a full view of the ARC of agents and services.
+
+  2. CLI docstring updated to match
+
+  - scripts/pmoves_cli.py
+
+    The top‐level docstring now reflects:
+      - This CLI treats core services as a team of provider‑native agents.
+      - It explicitly mentions:
+          - Inspecting agent roles, health, and MCP/A2A surfaces (for example Cipher’s /.well-known/agent.json).
+          - Being read‑only: it does not mutate data or configuration; it just uses existing scripts, endpoints, and env vars.
+
+  That ties together:
+
+  - Cipher as both an MCP server and an A2A‑discoverable agent.
+  - CLI mini agents as provider‑native, sitting side by side.
+  When you’re ready, we can take the next step of having the CLI actually pull Cipher’s /.well-known/agent.json and show a summarized description of Cipher’s capabilities when you run agent cipher—that would be the first concrete piece of the        
+  self‑catalog behavior.
+
+
+› but for OLLAMA and Local models I prefer Crush cus i want to customize it to sat PMOVES-BotZ
+
+
+• Ran pwsh.exe -Command 'Get-ChildItem features/crush -Recurse'
+  └ Get-ChildItem: Could not find a part of the path 'C:\Users\russe\Documents\GitHub\PMOVES-Kilobots\features\cipher\pmoves_cipher\node_modules\.pnpm\@ai-sdk+openai@1.3.23_zod@3.25.76\node_modules\@ai-sdk\provider'.
+    Get-ChildItem: Could not find a part of the path 'C:\Users\russe\Documents\GitHub\PMOVES-Kilobots\features\cipher\pmoves_cipher\node_modules\.pnpm\@ai-sdk+openai@1.3.23_zod@3.25.76\node_modules\@ai-sdk\provider-utils'.
+    … +2173 lines
+    -a---           11/7/2025 12:58 PM           5598 crush
+
+
+• Edited scripts\pmoves_cli.py (+4 -2)
+    161
+    162 -    # 1) Local Ollama (default preference)
+    162 +    # 1) Local Crush + Ollama (default preference)
+    163      ollama_base = os.getenv("OLLAMA_BASE_URL") or "http://host.docker.internal:11434"
+        ⋮
+    173
+    174 -    print("1) Local Ollama (preferred default)")
+    174 +    print("1) Local Crush + Ollama (preferred default)")
+    175      print(f"   - Base URL : {ollama_base}")
+        ⋮
+    178      print("       * Runs fully local models (no cloud key needed).")
+    179 +    print("       * In PMOVES-BoTZ, the preferred local LLM path is Crush + Ollama,")
+    180 +    print("         so Crush can present itself as PMOVES-BoTZ while talking to Ollama.")
+    181      print("       * Recommended to pull at least one model, e.g.:")
+
+• Ran pwsh.exe -Command 'Get-Content PMOVES_Edition.md -Tail 80'
+  └                                                                                                                                                                                                                                                       
+    ## 3. Refactoring Steps                                                                                                                                                                                                                               
+    … +76 lines                                                                                                                                                                                                                                           
+                                                                                                                                                                                                                                                          
+    This layered model keeps each feature self-contained (with its own provider-native CLI and tests) while allowing PMOVES-BoTZ to operate as a coordinated team of agents through the gateway and MCP modes, and to publish a unified catalog of agents/
+    tools into PMOVES-DoX.                                                                                                                                                                                                                                
+                                                                                                                                                                                                                                                          
+• Edited PMOVES_Edition.md (+6 -0)                                                                                                                                                                                                                        
+    122  This layered model keeps each feature self-contained (with its own provider-native CLI and tests) while allowing PMOVES-BoTZ to operate as a coordinated team of agents through the gateway and MCP modes, and to publish a unified catalog of ag
+         ents/tools into PMOVES-DoX.                                                                                                                                                                                                                      
+    123 +                                                                                                                                                                                                                                                 
+    124 +- **Local LLM Orchestration (Crush + Ollama)**                                                                                                                                                                                                   
+    125 +  - For local models, PMOVES-BoTZ prefers a **Crush + Ollama** path:                                                                                                                                                                             
+    126 +    - Ollama provides local model execution.                                                                                                                                                                                                     
+    127 +    - Crush acts as a local LLM router/orchestrator that can be customized to present itself as “PMOVES-BoTZ” while calling into Ollama.                                                                                                         
+    128 +  - This allows provider-native agents to fully leverage their SDKs/APIs, while keeping a consistent PMOVES-BoTZ identity at the CLI/agent layer.                                                                                                
+                                                                                                                                                                                                                                                          
+─ Worked for 2m 21s ──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+• Understood: for local models you want Crush to sit in front of Ollama so the local path is “Crush + Ollama”, branded as PMOVES‑BoTZ, and each CLI mini‑agent is provider‑native.
+                                                                                                                                                                                                                                                          
+  Here’s what I’ve done to align with that:                                                                                                                                                                                                               
+                                                                                                                                                                                                                                                          
+  1. CLI LLM options now call out Crush + Ollama                                                                                                                                                                                                          
+                                                                                                                                                                                                                                                          
+  In scripts/pmoves_cli.py, the local section of llm-options now says:                                                                                                                                                                                    
+                                                                                                                                                                                                                                                          
+  - “1) Local Crush + Ollama (preferred default)” and explains:                                                                                                                                                                                           
+      - Ollama is the local model engine.                                                                                                                                                                                                                 
+      - The preferred design is to run local models via Crush so it can present itself as PMOVES‑BoTZ while talking to Ollama.                                                                                                                            
+      - It still checks OLLAMA_BASE_URL directly today, but the text makes clear that the intended path is Crush + Ollama, not “raw Ollama”.                                                                                                              
+                                                                                                                                                                                                                                                          
+  So the CLI now reflects your preference: local models are conceptually “Crush + Ollama”, with Crush as the customizable router layer.                                                                                                                   
+
+  - A “Local LLM Orchestration (Crush + Ollama)” bullet under the mini‑agent section:
+      - States that for local models, PMOVES‑BoTZ prefers Crush + Ollama:
+          - Ollama = local execution.
+          - Crush = local LLM router/orchestrator, customizable to present as “PMOVES‑BoTZ”.
+  3. Org-level doc ties mini‑agent ARC + provider‑native CLIs together
+
+  In docs/PMOVES_Git_Organization.md:
+
+  - I added “Mini-Agent ARC & Provider-Native CLIs”, which ties together:
+      - When integrated into BoTZ, these CLIs join the mini‑agent city layer, bootstrapping or managing their own services.
+      - The first mission, once everything is green, is to catalog themselves and their capabilities and publish that into PMOVES‑DoX—your “ARC” of agents, tools, and services combined.
+
+  Nothing in this pass alters Crush code or re‑adds it to the MCP catalog yet; it simply makes sure:
+
+
+  When you’re ready, a good next step would be:
+
+  - Wire a Crush MCP or HTTP endpoint into core/mcp/catalog.yml or a features/crush overlay, then teach the CLI to probe that endpoint (in addition to Ollama) so the “Crush + Ollama” path is live, not just documented.
+
+
+› yes lets proceed with next steps
+
+
+• Ran pwsh.exe -Command 'Get-ChildItem features/crush'
+  └
+        Directory: C:\Users\russe\Documents\GitHub\PMOVES-Kilobots\features
+    … +3 lines
+    -a---           11/7/2025 12:58 PM           5598 crush
+
+
+• Ran pwsh.exe -Command 'Get-Content features/crush -TotalCount 80'
+  └ import os, subprocess, time, requests
+    from typing import Optional, List, Dict
+    … +76 lines
+    class HealthRequest(BaseModel):
+        targets: Optional[List[HealthTarget]] = None
+
+• Ran pwsh.exe -Command 'Get-Content features/crush -Tail 120'
+  └     command: str = "crush"
+        args: Optional[List[str]] = None
+    … +116 lines
+    if __name__ == "__main__":
+        uvicorn.run(app, host="0.0.0.0", port=7069)
+
+• Ran pwsh.exe -Command 'Get-Content features/metrics/docker-compose.yml -TotalCount 200'
+  └ services:                                                                                                                                                                                                                                             
+      prometheus:                                                                                                                                                                                                                                         
+    … +64 lines                                                                                                                                                                                                                                           
+      prometheus_data:                                                                                                                                                                                                                                    
+      grafana_data:                                                                                                                                                                                                                                       
+                                                                                                                                                                                                                                                          
+• Edited scripts\pmoves_cli.py (+7 -0)                                                                                                                                                                                                                    
+    58      },                                                                                                                                                                                                                                            
+    59 +    "crush": {                                                                                                                                                                                                                                    
+    60 +        "name": "Crush",                                                                                                                                                                                                                          
+    61 +        "description": "Local LLM/router shim for PMOVES-BoTZ (preferred front-end to Ollama).",                                                                                                                                                  
+    62 +        "health": "http://localhost:{port}/health/services",                                                                                                                                                                                      
+    63 +        "port_env": "CRUSH_PORT",                                                                                                                                                                                                                 
+    64 +        "default_port": "7069",                                                                                                                                                                                                                   
+    65 +    },                                                                                                                                                                                                                                            
+    66      "yt-mini": {                                                                                                                                                                                                                                  
+                                                                                                                                                                                                                                                          
+• Edited README.md (+1 -1)                                                                                                                                                                                                                                
+    74    - `status` – shows stack status using the existing `pmoves_status` script.                                                                                                                                                                      
+    75 -  - `agents` – lists known mini agents (gateway, docling, cipher, VL-sentinel, planned yt-mini).                                                                                                                                                  
+    75 +  - `agents` – lists known mini agents (gateway, docling, cipher, VL-sentinel, Crush, planned yt-mini).                                                                                                                                           
+    76    - `agent <name>` – shows details and health for a specific agent.                                                                                                                                                                               
+                                                                                                                                                                                                                                                          
+─ Worked for 1m 43s ──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+• That makes sense: for local models you want Crush as the front door, so it can present itself as PMOVES‑BoTZ while dispatching to Ollama.
+                                                                                                                                                                                                                                                          
+  Here’s what I’ve done toward that, without breaking anything:                                                                                                                                                                                           
+                                                                                                                                                                                                                                                          
+  1. CLI now recognizes Crush as a mini agent                                                                                                                                                                                                             
+                                                                                                                                                                                                                                                          
+  In scripts/pmoves_cli.py:                                                                                                                                                                                                                               
+                                                                                                                                                                                                                                                          
+  - Added a crush entry to the AGENTS map:                                                                                                                                                                                                                
+                                                                                                                                                                                                                                                          
+    "crush": {                                                                                                                                                                                                                                            
+        "name": "Crush",                                                                                                                                                                                                                                  
+        "description": "Local LLM/router shim for PMOVES-BoTZ (preferred front-end to Ollama).",                                                                                                                                                          
+        "health": "http://localhost:{port}/health/services",                                                                                                                                                                                              
+        "port_env": "CRUSH_PORT",                                                                                                                                                                                                                         
+        "default_port": "7069",                                                                                                                                                                                                                           
+    },                                                                                                                                                                                                                                                    
+  - This means:                                                                                                                                                                                                                                           
+      - python scripts/pmoves_cli.py list-agents now lists Crush along with gateway, docling, cipher, vl, and yt-mini.                                                                                                                                    
+      - python scripts/pmoves_cli.py agent crush will:                                                                                                                                                                                                    
+          - Resolve CRUSH_PORT (default 7069).                                                                                                                                                                                                            
+          - Probe http://localhost:7069/health/services.                                                                                                                                                                                                  
+          - Provider‑native agents use their own SDKs/APIs.
+          - Crush gives a unified PMOVES‑BoTZ identity at the CLI/agent layer for local LLMs.
+
+  3. README mentions Crush as part of the mini-agent city
+
+  In README.md under Mini-Agent CLI (Experimental), the agents description is updated:
+
+  - It now says:
+      - agents – lists known mini agents (gateway, docling, cipher, VL-sentinel, Crush, planned yt-mini).
+
+  So the UX story is now:
+
+  - The CLI is a small “city” of provider‑native mini agents.
+  - Local LLMs are conceptually Crush + Ollama, with Crush being the one that can be branded as PMOVES‑BoTZ and extended later.
+  - Cipher, Crush, and the others will eventually self‑catalog into PMOVES‑DoX, matching the ARC of agents you have across repos.
+
+  - Add an optional features/crush/docker-compose.yml that runs the features/crush FastAPI shim as a container on 7069.
+  - Add a safe MCP catalog entry pointing at that HTTP server (or keep it as a tool endpoint) so MCP clients and big‑bro agents can call Crush through the gateway.
+
+─ Worked for 1m 19s ──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+• Compact task completed
+
+⚠ Heads up: Long conversations and multiple compactions can cause the model to be less accurate. Start a new conversation when possible to keep conversations small and targeted.
+
+╭───────────────────────────────────────────────╮
+│ >_ OpenAI Codex (v0.58.0)                     │
+│                                               │
+│ model:     gpt-5.1 medium   /model to change  │
+│ directory: ~\Documents\GitHub\PMOVES-Kilobots │
+╰───────────────────────────────────────────────╯
+
+  To get started, describe a task or try one of these commands:
+
+  /init - create an AGENTS.md file with instructions for Codex
+  /status - show current session configuration
+  /approvals - choose what Codex can do without approval
+  /model - choose what model and reasoning effort to use
+  /review - review any changes and find issues
+
+■ MCP client for `MCP_DOCKER` timed out after 10 seconds. Add or adjust `startup_timeout_sec` in your config.toml:
+[mcp_servers.MCP_DOCKER]
+startup_timeout_sec = XX
+
+⚠ `tools.web_search` is deprecated. Use `web_search_request` instead.
+Enable it with `--enable web_search_request` or `[features].web_search_request` in config.toml. See https://github.com/openai/codex/blob/main/docs/config.md#feature-flags for details.
+                                                                                                                                                                                                                                                          
+
+• Got it — so the requirements are:
+
+  - crush is a first‑class, non‑optional CLI surface.
+  - All existing CLIs in the repo keep shipping (PowerShell, Bash, etc.).
+  - The goal is to let people:
+      - use their preferred CLI directly, and
+      - still orchestrate across them from within a CLI (not a separate GUI or web layer).
+
+  A concrete way to structure this in the repo:
+
+  - Single task definition layer
+      - Add something like core/tasks.yml (or core/tasks.py) that defines canonical operations: bring_up, status, autodiscover, etc.
+      - This becomes the single source of truth; no logic duplicated in each CLI.
+  - Thin wrappers per CLI
+      - PowerShell: existing ./scripts/*.ps1 call into the task layer.
+      - Bash: existing ./scripts/*.sh call the same task layer.
+      - crush: add a scripts/pmoves.crush (or similar) that:
+          - imports the same task layer, or
+          - shells out to a small Python/Node “task runner” so behavior is identical.
+  - Orchestration inside any CLI
+      - From crush, expose high‑level commands that:
+          - call PS/Bash scripts where needed (for platform‑specific bits), and
+          - read from the same .env and config files so everything composes.
+      - From PS/Bash, you can optionally expose pmz crush ... subcommands that delegate into crush when users want its richer pipeline semantics.
+
+  If you tell me which CLIs you consider “in scope” (PowerShell, Bash, crush, maybe python -m pmoves?), I can sketch an exact tasks.yml layout and the crush wrapper, or propose specific file additions (paths + command names) consistent with the      
+  repo’s structure.

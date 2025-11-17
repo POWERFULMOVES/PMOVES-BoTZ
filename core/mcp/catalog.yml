@@ -26,3 +26,8 @@ mcpServers:
     url: http://vl-sentinel:${VL_SENTINEL_PORT:-7072}
     timeout: 30
     retries: 3
+  crush:
+    type: http
+    url: http://crush-shim:7069
+    timeout: 30
+    retries: 3

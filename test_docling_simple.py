@@ -7,7 +7,7 @@ import sys
 from pathlib import Path
 
 # Add project directory to path
-sys.path.insert(0, str(Path(__file__).parent / "pmoves_multi_agent_pro_pack"))
+sys.path.insert(0, str(Path(__file__).parent.parent))
 
 def main():
     print("Testing improved Docling import implementation...")

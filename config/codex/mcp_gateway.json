@@ -1,0 +1,17 @@
+{
+  "mcpServers": {
+    "pmoves-gateway-local": {
+      "transport": "http",
+      "url": "http://localhost:2091"
+    },
+    "pmoves-gateway-net": {
+      "transport": "http",
+      "url": "http://mcp-gateway:8000"
+    },
+    "cipher-direct": {
+      "transport": "http",
+      "url": "http://localhost:3011"
+    }
+  }
+}
+

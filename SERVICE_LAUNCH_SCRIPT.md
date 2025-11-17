@@ -60,7 +60,7 @@ curl -H "Accept: text/event-stream" -f http://localhost:3020/health
 curl -f http://localhost:2091/health
 curl -f http://localhost:7071/health
 curl -f http://localhost:7072/health
-curl -f http://localhost:8080/health
+curl -f http://localhost:3011/health
 ```
 
 ### Quick Status Script
@@ -73,7 +73,7 @@ services=(
     "mcp-gateway:2091"
     "e2b-runner:7071"
     "vl-sentinel:7072"
-    "cipher-memory:8080"
+    "cipher-memory:3011"
 )
 
 for service in "${services[@]}"; do

@@ -138,6 +138,24 @@ services:
       - "${CIPHER_API_PORT:-3011}:${CIPHER_API_PORT:-3011}"
     restart: unless-stopped
 
+  crush-shim:
+    image: python:3.11-slim
+    env_file: *env_files
+    working_dir: /srv
+    environment:
+      PYTHONUNBUFFERED: "1"
+    volumes:
+      - ../../:/srv:ro
+    command: >
+      sh -lc "pip install --no-cache-dir fastapi uvicorn[standard] pydantic requests pipx &&
+              python features/crush"
+    ports:
+      - "${CRUSH_PORT:-7069}:7069"
+    restart: unless-stopped
+    labels:
+      pmoves.service: crush
+      pmoves.health: http://crush-shim:7069/health/services
+
   postman-mcp-local:
     image: node:20-alpine
     working_dir: /srv

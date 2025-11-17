@@ -1,4 +1,26 @@
-# PMOVES MCP PRO Pack (Docling + Postman + E2B + VL Sentinel + Kilo)
+# [DEPRECATED] PMOVES MCP PRO Pack (Docling + Postman + E2B + VL Sentinel + Kilo)
+
+This pack has been superseded by the unified overlays under `core/` + `features/` with the PMOVES‑BotZ gateway.
+
+Quick start (namespaced):
+```
+export PMZ_NAMESPACE=botz-dev
+export COMPOSE_PROJECT_NAME=$PMZ_NAMESPACE
+docker compose --env-file .env \
+  -f core/docker-compose/base.yml \
+  -f features/pro/docker-compose.yml \
+  up -d
+```
+
+To join the PMOVES.AI network:
+```
+export PMOVES_AI_NETWORK=pmoves-net
+docker compose --env-file .env \
+  -f core/docker-compose/base.yml \
+  -f features/pro/docker-compose.yml \
+  -f features/network/external.yml \
+  up -d
+```
 
 This pack extends the multi-agent setup with **E2B sandboxes** for safe code execution and a **Vision‑Language sentinel** for monitoring/guidance.
 

@@ -55,7 +55,7 @@ class AnalyticsDashboardTester:
         print("\n2. Testing Analytics Dashboard Component...")
         
         # Check if the dashboard component exists
-        dashboard_path = Path("pmoves_multi_agent_pro_pack/memory_shim/pmoves_cipher/src/web/ui/analytics/AnalyticsDashboard.tsx")
+        dashboard_path = Path("features/cipher/pmoves_cipher/src/web/ui/analytics/AnalyticsDashboard.tsx")
         
         if not dashboard_path.exists():
             self.log_test("Dashboard Component Exists", False, "File not found")

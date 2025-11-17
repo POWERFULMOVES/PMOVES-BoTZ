@@ -1,6 +1,6 @@
 {
   "id": "pmoves-orchestrator",
-  "title": "PMOVES • Orchestrator",
+  "title": "PMOVES \u2022 Orchestrator",
   "description": "Routes tasks between Docling and Postman modes.",
   "routingRules": [
     {

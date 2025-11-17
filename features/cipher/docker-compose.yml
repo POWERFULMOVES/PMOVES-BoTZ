@@ -1,50 +1,9 @@
-services:
-  cipher-memory:
-    build:
-      context: ../../pmoves_multi_agent_pro_pack/memory_shim
-      dockerfile: Dockerfile.cipher
-    environment:
-      # Kilo-Bots "mini transformers": Cipher is the memory specialist.
-      # Local-first mindset: you can swap providers; defaults keep Venice off unless key provided.
-      VENICE_API_KEY: ${VENICE_API_KEY}
-      CIPHER_CONFIG_PATH: /app/memory_shim/pmoves_cipher/memAgent/cipher_pmoves.yml
-      PMOVES_ROOT: /app
-      CIPHER_UI_PORT: 3010
-      CIPHER_API_PORT: 3011
-      CIPHER_UI_MODE: "true"
-      NODE_ENV: production
-      # Local-first: disable OAuth2 or provide dummy values so UI can boot
-      OAUTH2_ENABLED: ${OAUTH2_ENABLED:-false}
-      OAUTH2_CALLBACK_URL: ${OAUTH2_CALLBACK_URL:-http://localhost:3010/auth/callback}
-      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-local-dev}
-      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-local-dev}
-      CIPHER_ENCRYPTION_KEY: ${CIPHER_ENCRYPTION_KEY:-dev-local-master-key-please-change}
-      # Optional: declare a provider hint for future local providers (e.g., 'local', 'venice').
-      # This variable is informational unless your config consumes it.
-      CIPHER_PROVIDER: ${CIPHER_PROVIDER:-venice}
-    volumes:
-      - ../../pmoves_multi_agent_pro_pack/memory_shim/pmoves_cipher:/app/memory_shim/pmoves_cipher
-    ports:
-      - "${CIPHER_UI_PORT:-3010}:3010"
-      - "${CIPHER_API_PORT:-3011}:3011"
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "sh", "-c", "curl -f http://localhost:3011/health || curl -f http://localhost:3010 || exit 1"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 60s
-    labels:
-      pmoves.service: "cipher"
-      pmoves.health: "http://cipher-memory:3011/health"
-    networks:
-      default:
-        aliases: ["${PMZ_NAMESPACE:-pmoves-botz}_cipher", "cipher-memory"]
-      pmoves_ai: {}
+version: "3.9"
 
-networks:
-  default:
-    name: ${PMZ_NAMESPACE:-pmoves-botz}_net
-  pmoves_ai:
-    external: true
-    name: ${PMOVES_AI_NETWORK:-pmoves-net}
+# PMOVES-BoTZ Cipher overlay
+# This overlay currently does not add additional services beyond those defined
+# in core/docker-compose/base.yml. It exists to keep compose includes for
+# Cipher consistent across scripts and documentation.
+
+services: {}
+

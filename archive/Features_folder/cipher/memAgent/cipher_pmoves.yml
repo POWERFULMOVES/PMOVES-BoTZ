@@ -1,0 +1,58 @@
+# PMOVES Cipher Configuration
+# This configuration uses Venice.ai OpenAI-compatible models
+
+# LLM Configuration
+llm:
+  provider: openai
+  model: llama-3.2-3b-instruct
+  apiKey: $VENICE_API_KEY
+  baseURL: https://api.venice.ai/api/v1
+
+# Memory Configuration
+memory:
+  # Vector storage backend
+  vectorStore:
+    type: in-memory
+    dimensions: 1536
+    
+  # Knowledge graph configuration
+  knowledgeGraph:
+    type: in-memory
+    
+  # Storage configuration
+  storage:
+    type: sqlite
+    path: ./data/cipher_memory.db
+
+# Processing Configuration
+processing:
+  # Chunking strategy
+  chunking:
+    type: semantic
+    maxChunkSize: 1000
+    overlap: 200
+    
+  # Embedding configuration
+  embedding:
+    provider: openai
+    model: text-embedding-3-small
+    apiKey: $VENICE_API_KEY
+    baseURL: https://api.venice.ai/api/v1
+
+# System Prompt Configuration
+systemPrompt:
+  enabled: true
+  content: |
+    You are an AI memory assistant for PMOVES multi-agent workflows.
+    Your role is to manage persistent knowledge, reasoning patterns, and cross-session learning.
+    Always provide accurate, contextual responses based on stored memories and current context.
+
+# MCP Configuration
+mcp:
+  enabled: true
+  port: 3000
+  
+# Logging Configuration
+logging:
+  level: info
+  file: ./logs/cipher.log

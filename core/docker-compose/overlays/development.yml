@@ -1,0 +1,42 @@
+version: "3.9"
+
+services:
+  mcp-gateway:
+    ports:
+      - "2091:2091"
+
+  docling-mcp:
+    ports:
+      - "3020:3020"
+      - "3021:3020"
+    environment:
+      DOCLING_MCP_ENVIRONMENT: development
+      DOCLING_MCP_LOGGING__LEVEL: DEBUG
+      DOCLING_MCP_PERFORMANCE__TOOL_TIMEOUT: 60.0
+      DOCLING_MCP_PERFORMANCE__MAX_CONNECTIONS: 50
+      DOCLING_MCP_SECURITY__ENABLE_RATE_LIMITING: "false"
+      DOCLING_MCP_DOCLING__MAX_FILE_SIZE: 52428800
+    volumes:
+      - ./config/development.yaml:/srv/config/development.yaml:ro
+      - ./logs:/var/log
+
+  e2b-runner:
+    ports:
+      - "7071:7071"
+
+  vl-sentinel:
+    ports:
+      - "7072:7072"
+
+  cipher-memory:
+    ports:
+      - "3010:3010"
+      - "3011:3011"
+
+  crush-shim:
+    ports:
+      - "7069:7069"
+    environment:
+      ENVIRONMENT: "staging"
+      DOCS_LOG_CHANNEL: "#cataclysm-deploys-staging"
+      SLACK_CHANNEL: "#cataclysm-deploys-staging"

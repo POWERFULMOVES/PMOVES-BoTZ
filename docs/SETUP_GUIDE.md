@@ -63,16 +63,39 @@ If you prefer manual control:
 
 ```bash
 # Basic setup
-docker compose -f core/docker-compose/base.yml up -d
+docker compose --env-file .env -f core/docker-compose/base.yml up -d
 
-# Pro setup
-docker compose \
+# Pro setup (Windows/macOS/Linux) with namespace\nexport PMZ_NAMESPACE=botz-dev\nexport COMPOSE_PROJECT_NAME=\ndocker compose --env-file .env \\
+  -f core/docker-compose/base.yml \\
+  -f features/pro/docker-compose.yml \\
+  up -d
+
+# Optional: enable Tailscale on Linux
+COMPOSE_PROFILES=linux docker compose \
   -f core/docker-compose/base.yml \
   -f features/pro/docker-compose.yml \
   up -d
 
+### Use PMOVES‑BotZ Gateway (proxy)
+
+To run the new PMOVES‑BotZ gateway instead of the default Python gateway:
+
+```bash
+COMPOSE_PROJECT_NAME= docker compose --env-file .env \\
+  -f core/docker-compose/base.yml \\
+  -f features/pro/docker-compose.yml \\
+  -f features/gateway-proxy/docker-compose.yml \\
+  up -d
+```
+
+By default this proxies Docling at `http://docling-mcp:3020`. To proxy a different MCP server, set:
+
+```bash
+export MCP_PROXY_URL=http://host:port
+```
+
 # Full setup
-docker compose \
+docker compose --env-file .env \
   -f core/docker-compose/base.yml \
   -f features/pro/docker-compose.yml \
   -f features/mini/docker-compose.yml \
@@ -378,3 +401,4 @@ print(f"Gateway status: {response.status_code}")
 ---
 
 **Need help?** Start with the basic configuration and gradually add features. Check the logs if you encounter issues, and refer to the troubleshooting section above.
+
