@@ -1,19 +1,24 @@
 {
-  "id": "pmoves-auto-research-mode",
-  "title": "PMOVES • Auto Research",
-  "description": "Automated research and analysis using E2B sandbox and VL sentinel.",
+  "id": "pmoves-auto-research",
+  "title": "PMOVES • Auto Researcher",
+  "description": "Plan → gather → synthesize. Uses Docling for docs, E2B for code, VL Sentinel for screenshots/figures, Cipher Memory for persistent knowledge.",
   "whenToUse": [
-    "Automated code execution and testing",
-    "Research tasks requiring sandboxed environments",
-    "Vision-language analysis of research materials"
+    "End-to-end tasks that combine reading docs, running code, and interpreting charts/figures.",
+    "Research tasks requiring persistent knowledge across sessions",
+    "Complex analysis requiring reasoning pattern storage"
   ],
   "tools": [
+    "docling:*",
     "e2b:*",
-    "vl-sentinel:*"
+    "vl-sentinel:*",
+    "cipher-memory:*"
   ],
   "instructions": [
-    "Use E2B for safe code execution in isolated environments.",
-    "Leverage VL sentinel for visual analysis of research outputs.",
-    "Combine with docling for comprehensive research workflows."
+    "1) Search cipher memory for relevant past research and patterns.",
+    "2) Ask Docling to extract key sections/endpoints from new documents.",
+    "3) Stage code in E2B and run it with sample inputs.",
+    "4) Send plots/screenshots to VL Sentinel for sanity checks and suggestions.",
+    "5) Store research findings and reasoning patterns in cipher memory.",
+    "6) Produce a final report (bulleted summary + artifacts list)."
   ]
 }

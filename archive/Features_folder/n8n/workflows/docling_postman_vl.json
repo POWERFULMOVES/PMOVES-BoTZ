@@ -1,0 +1,102 @@
+{
+  "name": "PMOVES Docling \u2192 Postman \u2192 VL \u2192 Notify",
+  "nodes": [
+    {
+      "parameters": {
+        "path": "pmoves/run",
+        "options": {}
+      },
+      "id": "Webhook",
+      "name": "Incoming Trigger",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "url": "http://127.0.0.1:3020/tools/extract",
+        "options": {}
+      },
+      "id": "DoclingExtract",
+      "name": "Docling Extract",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3
+    },
+    {
+      "parameters": {
+        "url": "https://mcp.postman.com/mcp",
+        "options": {}
+      },
+      "id": "PostmanBuild",
+      "name": "Postman Build",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3
+    },
+    {
+      "parameters": {
+        "url": "http://127.0.0.1:7072/vl/guide",
+        "options": {}
+      },
+      "id": "VLGuide",
+      "name": "VL Sentinel",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3
+    },
+    {
+      "parameters": {
+        "url": "http://127.0.0.1:7069/notify/slack",
+        "options": {}
+      },
+      "id": "NotifySlack",
+      "name": "Notify Slack",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3
+    }
+  ],
+  "connections": {
+    "DoclingExtract": {
+      "main": [
+        [
+          {
+            "node": "PostmanBuild",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "PostmanBuild": {
+      "main": [
+        [
+          {
+            "node": "VLGuide",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "VLGuide": {
+      "main": [
+        [
+          {
+            "node": "NotifySlack",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "DoclingExtract",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false
+}

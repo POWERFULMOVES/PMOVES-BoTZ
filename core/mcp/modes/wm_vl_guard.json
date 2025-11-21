@@ -1,18 +1,15 @@
 {
   "id": "pmoves-wm-vl-guard",
-  "title": "PMOVES • VL Guard",
-  "description": "Vision-Language monitoring and guardrails for workflow management.",
+  "title": "PMOVES \u2022 Workflow Manager (VL Guard)",
+  "description": "Coordinates Docling \u2192 Postman \u2192 E2B with visual checks via VL Sentinel.",
   "whenToUse": [
-    "Monitoring visual outputs and screenshots",
-    "Content validation and safety checks",
-    "Automated quality assurance for visual content"
-  ],
-  "tools": [
-    "vl-sentinel:*"
+    "Complex tasks requiring doc parsing, API execution, code runs, and visual QA."
   ],
   "instructions": [
-    "Use VL sentinel for visual analysis and monitoring.",
-    "Configure appropriate VL provider (Ollama/OpenAI).",
-    "Set up guardrails for content validation and safety."
+    "Gather requirements with Docling first.",
+    "Execute API steps or scaffolding with Postman.",
+    "Run code or tests in E2B; persist artifacts.",
+    "Send screenshots/plots to VL Sentinel for guidance and sanity checks.",
+    "Report final status, include links/artifacts."
   ]
 }

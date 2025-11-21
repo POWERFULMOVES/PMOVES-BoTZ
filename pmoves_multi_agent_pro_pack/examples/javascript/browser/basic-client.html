@@ -1,0 +1,598 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Docling MCP Browser Client</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+        }
+        .section {
+            margin: 20px 0;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        .status {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+            font-weight: bold;
+        }
+        .status.connected {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .status.disconnected {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .status.error {
+            background-color: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffeaa7;
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        button:disabled {
+            background-color: #6c757d;
+            cursor: not-allowed;
+        }
+        input, textarea, select {
+            width: 100%;
+            padding: 8px;
+            margin: 5px 0;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+        textarea {
+            min-height: 100px;
+            resize: vertical;
+        }
+        .output {
+            background-color: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            padding: 15px;
+            margin: 10px 0;
+            font-family: 'Courier New', monospace;
+            white-space: pre-wrap;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .file-upload {
+            margin: 10px 0;
+        }
+        .metrics {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 10px;
+            margin: 10px 0;
+        }
+        .metric {
+            background-color: #e9ecef;
+            padding: 10px;
+            border-radius: 4px;
+            text-align: center;
+        }
+        .metric-value {
+            font-size: 1.2em;
+            font-weight: bold;
+            color: #007bff;
+        }
+        .log-entry {
+            padding: 5px;
+            margin: 2px 0;
+            border-left: 3px solid #007bff;
+            background-color: #f8f9fa;
+        }
+        .log-entry.error {
+            border-left-color: #dc3545;
+            background-color: #f8d7da;
+        }
+        .log-entry.success {
+            border-left-color: #28a745;
+            background-color: #d4edda;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Docling MCP Browser Client</h1>
+        
+        <div class="section">
+            <h2>Connection Status</h2>
+            <div id="connection-status" class="status disconnected">Disconnected</div>
+            <div class="metrics">
+                <div class="metric">
+                    <div class="metric-value" id="connection-count">0</div>
+                    <div>Connections</div>
+                </div>
+                <div class="metric">
+                    <div class="metric-value" id="request-count">0</div>
+                    <div>Requests</div>
+                </div>
+                <div class="metric">
+                    <div class="metric-value" id="error-count">0</div>
+                    <div>Errors</div>
+                </div>
+                <div class="metric">
+                    <div class="metric-value" id="avg-response-time">0ms</div>
+                    <div>Avg Response Time</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>Server Information</h2>
+            <button onclick="getServerInfo()">Get Server Info</button>
+            <button onclick="listTools()">List Available Tools</button>
+            <button onclick="healthCheck()">Health Check</button>
+            <div id="server-info" class="output" style="display: none;"></div>
+        </div>
+
+        <div class="section">
+            <h2>Document Conversion</h2>
+            <div class="file-upload">
+                <label for="file-input">Select Document:</label>
+                <input type="file" id="file-input" accept=".pdf,.docx,.pptx,.xlsx,.html,.txt,.md">
+            </div>
+            <div>
+                <label for="output-format">Output Format:</label>
+                <select id="output-format">
+                    <option value="markdown">Markdown</option>
+                    <option value="text">Plain Text</option>
+                    <option value="json">JSON</option>
+                </select>
+            </div>
+            <button onclick="convertDocument()" id="convert-btn">Convert Document</button>
+            <div id="conversion-result" class="output" style="display: none;"></div>
+        </div>
+
+        <div class="section">
+            <h2>Batch Processing</h2>
+            <div class="file-upload">
+                <label for="batch-files">Select Multiple Documents:</label>
+                <input type="file" id="batch-files" multiple accept=".pdf,.docx,.pptx,.xlsx,.html,.txt,.md">
+            </div>
+            <div>
+                <label for="batch-output-format">Output Format:</label>
+                <select id="batch-output-format">
+                    <option value="markdown">Markdown</option>
+                    <option value="text">Plain Text</option>
+                    <option value="json">JSON</option>
+                </select>
+            </div>
+            <button onclick="processBatch()" id="batch-btn">Process Batch</button>
+            <div id="batch-result" class="output" style="display: none;"></div>
+        </div>
+
+        <div class="section">
+            <h2>Connection Settings</h2>
+            <div>
+                <label for="server-url">Server URL:</label>
+                <input type="text" id="server-url" value="http://localhost:3020/mcp" placeholder="http://localhost:3020/mcp">
+            </div>
+            <div>
+                <label for="connection-timeout">Connection Timeout (ms):</label>
+                <input type="number" id="connection-timeout" value="30000" min="1000" max="120000">
+            </div>
+            <button onclick="connect()">Connect</button>
+            <button onclick="disconnect()">Disconnect</button>
+        </div>
+
+        <div class="section">
+            <h2>Activity Log</h2>
+            <div id="activity-log" style="max-height: 200px; overflow-y: auto; border: 1px solid #ddd; padding: 10px; border-radius: 4px;"></div>
+            <button onclick="clearLog()">Clear Log</button>
+        </div>
+    </div>
+
+    <script>
+        class DoclingMCPClient {
+            constructor(serverUrl) {
+                this.serverUrl = serverUrl;
+                this.eventSource = null;
+                this.isConnected = false;
+                this.messageHandlers = new Map();
+                this.requestId = 0;
+                this.pendingRequests = new Map();
+                this.metrics = {
+                    connections: 0,
+                    requests: 0,
+                    errors: 0,
+                    responseTimes: []
+                };
+            }
+
+            connect() {
+                return new Promise((resolve, reject) => {
+                    try {
+                        this.eventSource = new EventSource(this.serverUrl);
+                        
+                        this.eventSource.onopen = () => {
+                            this.isConnected = true;
+                            this.metrics.connections++;
+                            this.log('Connected to Docling MCP server', 'success');
+                            resolve();
+                        };
+
+                        this.eventSource.onmessage = (event) => {
+                            this.handleMessage(event.data);
+                        };
+
+                        this.eventSource.onerror = (error) => {
+                            this.isConnected = false;
+                            this.metrics.errors++;
+                            this.log('Connection error: ' + error, 'error');
+                            reject(error);
+                        };
+
+                    } catch (error) {
+                        this.log('Failed to connect: ' + error.message, 'error');
+                        reject(error);
+                    }
+                });
+            }
+
+            disconnect() {
+                if (this.eventSource) {
+                    this.eventSource.close();
+                    this.isConnected = false;
+                    this.log('Disconnected from server', 'info');
+                }
+            }
+
+            handleMessage(data) {
+                try {
+                    const message = JSON.parse(data);
+                    
+                    if (message.id && this.pendingRequests.has(message.id)) {
+                        const { resolve, reject, startTime } = this.pendingRequests.get(message.id);
+                        this.pendingRequests.delete(message.id);
+                        
+                        const responseTime = Date.now() - startTime;
+                        this.metrics.responseTimes.push(responseTime);
+                        
+                        if (message.error) {
+                            reject(new Error(message.error.message || 'Unknown error'));
+                        } else {
+                            resolve(message.result);
+                        }
+                    }
+                } catch (error) {
+                    this.log('Error handling message: ' + error.message, 'error');
+                }
+            }
+
+            async callTool(toolName, toolArguments = {}) {
+                if (!this.isConnected) {
+                    throw new Error('Not connected to server');
+                }
+
+                const requestId = ++this.requestId;
+                const request = {
+                    jsonrpc: '2.0',
+                    id: requestId,
+                    method: 'tools/call',
+                    params: {
+                        name: toolName,
+                        arguments: toolArguments
+                    }
+                };
+
+                return new Promise((resolve, reject) => {
+                    const startTime = Date.now();
+                    this.metrics.requests++;
+                    
+                    this.pendingRequests.set(requestId, { resolve, reject, startTime });
+                    
+                    // Send request via SSE
+                    this.eventSource.send(JSON.stringify(request));
+                    
+                    // Timeout handling
+                    setTimeout(() => {
+                        if (this.pendingRequests.has(requestId)) {
+                            this.pendingRequests.delete(requestId);
+                            reject(new Error('Request timeout'));
+                        }
+                    }, 30000);
+                });
+            }
+
+            async listTools() {
+                return this.callTool('list_tools');
+            }
+
+            async healthCheck() {
+                return this.callTool('health_check');
+            }
+
+            getMetrics() {
+                const avgResponseTime = this.metrics.responseTimes.length > 0 
+                    ? this.metrics.responseTimes.reduce((a, b) => a + b, 0) / this.metrics.responseTimes.length 
+                    : 0;
+                
+                return {
+                    connections: this.metrics.connections,
+                    requests: this.metrics.requests,
+                    errors: this.metrics.errors,
+                    avgResponseTime: Math.round(avgResponseTime)
+                };
+            }
+
+            log(message, level = 'info') {
+                const timestamp = new Date().toLocaleTimeString();
+                const logEntry = `[${timestamp}] ${message}`;
+                
+                if (typeof window !== 'undefined' && window.logActivity) {
+                    window.logActivity(logEntry, level);
+                }
+                
+                console.log(`[${level.toUpperCase()}] ${logEntry}`);
+            }
+        }
+
+        // Global client instance
+        let client = null;
+
+        // UI Functions
+        function updateConnectionStatus(connected) {
+            const statusEl = document.getElementById('connection-status');
+            if (connected) {
+                statusEl.textContent = 'Connected';
+                statusEl.className = 'status connected';
+            } else {
+                statusEl.textContent = 'Disconnected';
+                statusEl.className = 'status disconnected';
+            }
+        }
+
+        function updateMetrics() {
+            if (client) {
+                const metrics = client.getMetrics();
+                document.getElementById('connection-count').textContent = metrics.connections;
+                document.getElementById('request-count').textContent = metrics.requests;
+                document.getElementById('error-count').textContent = metrics.errors;
+                document.getElementById('avg-response-time').textContent = metrics.avgResponseTime + 'ms';
+            }
+        }
+
+        function logActivity(message, level = 'info') {
+            const logEl = document.getElementById('activity-log');
+            const entry = document.createElement('div');
+            entry.className = `log-entry ${level}`;
+            entry.textContent = message;
+            logEl.appendChild(entry);
+            logEl.scrollTop = logEl.scrollHeight;
+        }
+
+        function clearLog() {
+            document.getElementById('activity-log').innerHTML = '';
+        }
+
+        // Client Functions
+        async function connect() {
+            const serverUrl = document.getElementById('server-url').value;
+            const timeout = parseInt(document.getElementById('connection-timeout').value);
+            
+            try {
+                client = new DoclingMCPClient(serverUrl);
+                await client.connect();
+                updateConnectionStatus(true);
+                updateMetrics();
+                logActivity('Successfully connected to server', 'success');
+            } catch (error) {
+                updateConnectionStatus(false);
+                logActivity('Connection failed: ' + error.message, 'error');
+            }
+        }
+
+        function disconnect() {
+            if (client) {
+                client.disconnect();
+                client = null;
+                updateConnectionStatus(false);
+                logActivity('Disconnected from server', 'info');
+            }
+        }
+
+        async function getServerInfo() {
+            if (!client) {
+                logActivity('Not connected to server', 'error');
+                return;
+            }
+
+            try {
+                const result = await client.callTool('get_config');
+                document.getElementById('server-info').textContent = JSON.stringify(result, null, 2);
+                document.getElementById('server-info').style.display = 'block';
+                logActivity('Server info retrieved successfully', 'success');
+            } catch (error) {
+                logActivity('Error getting server info: ' + error.message, 'error');
+            }
+        }
+
+        async function listTools() {
+            if (!client) {
+                logActivity('Not connected to server', 'error');
+                return;
+            }
+
+            try {
+                const result = await client.listTools();
+                document.getElementById('server-info').textContent = JSON.stringify(result, null, 2);
+                document.getElementById('server-info').style.display = 'block';
+                logActivity('Tools listed successfully', 'success');
+            } catch (error) {
+                logActivity('Error listing tools: ' + error.message, 'error');
+            }
+        }
+
+        async function healthCheck() {
+            if (!client) {
+                logActivity('Not connected to server', 'error');
+                return;
+            }
+
+            try {
+                const result = await client.healthCheck();
+                document.getElementById('server-info').textContent = JSON.stringify(result, null, 2);
+                document.getElementById('server-info').style.display = 'block';
+                logActivity('Health check completed', 'success');
+            } catch (error) {
+                logActivity('Health check failed: ' + error.message, 'error');
+            }
+        }
+
+        async function convertDocument() {
+            const fileInput = document.getElementById('file-input');
+            const outputFormat = document.getElementById('output-format').value;
+            
+            if (!fileInput.files.length) {
+                logActivity('Please select a document file', 'error');
+                return;
+            }
+
+            if (!client) {
+                logActivity('Not connected to server', 'error');
+                return;
+            }
+
+            const file = fileInput.files[0];
+            const convertBtn = document.getElementById('convert-btn');
+            
+            try {
+                convertBtn.disabled = true;
+                convertBtn.textContent = 'Converting...';
+                logActivity(`Converting ${file.name} to ${outputFormat}...`, 'info');
+
+                // In a real implementation, you would upload the file to a server first
+                // and then pass the server file path to the MCP service
+                // For this demo, we'll simulate the conversion
+                const result = await simulateDocumentConversion(file, outputFormat);
+                
+                document.getElementById('conversion-result').textContent = result;
+                document.getElementById('conversion-result').style.display = 'block';
+                logActivity('Document converted successfully', 'success');
+                
+            } catch (error) {
+                logActivity('Conversion failed: ' + error.message, 'error');
+            } finally {
+                convertBtn.disabled = false;
+                convertBtn.textContent = 'Convert Document';
+            }
+        }
+
+        async function processBatch() {
+            const fileInput = document.getElementById('batch-files');
+            const outputFormat = document.getElementById('batch-output-format').value;
+            
+            if (!fileInput.files.length) {
+                logActivity('Please select document files', 'error');
+                return;
+            }
+
+            if (!client) {
+                logActivity('Not connected to server', 'error');
+                return;
+            }
+
+            const files = Array.from(fileInput.files);
+            const batchBtn = document.getElementById('batch-btn');
+            
+            try {
+                batchBtn.disabled = true;
+                batchBtn.textContent = 'Processing...';
+                logActivity(`Processing batch of ${files.length} documents...`, 'info');
+
+                // Simulate batch processing
+                const results = [];
+                for (let i = 0; i < files.length; i++) {
+                    const file = files[i];
+                    logActivity(`Processing ${file.name} (${i + 1}/${files.length})...`, 'info');
+                    const result = await simulateDocumentConversion(file, outputFormat);
+                    results.push(`=== ${file.name} ===\n${result}`);
+                }
+                
+                document.getElementById('batch-result').textContent = results.join('\n\n');
+                document.getElementById('batch-result').style.display = 'block';
+                logActivity('Batch processing completed successfully', 'success');
+                
+            } catch (error) {
+                logActivity('Batch processing failed: ' + error.message, 'error');
+            } finally {
+                batchBtn.disabled = false;
+                batchBtn.textContent = 'Process Batch';
+            }
+        }
+
+        // Simulation function for demo purposes
+        async function simulateDocumentConversion(file, outputFormat) {
+            // Simulate processing time
+            await new Promise(resolve => setTimeout(resolve, 1000 + Math.random() * 2000));
+            
+            // Simulate different output formats
+            const sampleContent = {
+                markdown: `# ${file.name}\n\nThis is a simulated conversion of the document to Markdown format.\n\n## Content\n\nThe document has been processed successfully. In a real implementation, this would contain the actual converted content from the Docling MCP service.\n\n### Features\n- Document conversion\n- Format preservation\n- Text extraction\n\n**File:** ${file.name}\n**Size:** ${(file.size / 1024).toFixed(2)} KB\n**Format:** ${outputFormat}`,
+                
+                text: `Document: ${file.name}\nSize: ${(file.size / 1024).toFixed(2)} KB\nFormat: ${outputFormat}\n\nThis is a simulated text conversion of the document. In a real implementation, this would contain the actual converted text content from the Docling MCP service.`,
+                
+                json: JSON.stringify({
+                    document: {
+                        filename: file.name,
+                        size: file.size,
+                        format: outputFormat,
+                        content: "This is simulated JSON output. In a real implementation, this would contain the actual structured data from the Docling MCP service.",
+                        metadata: {
+                            processed_at: new Date().toISOString(),
+                            simulated: true
+                        }
+                    }
+                }, null, 2)
+            };
+            
+            return sampleContent[outputFormat] || sampleContent.markdown;
+        }
+
+        // Make logActivity available globally for the client
+        window.logActivity = logActivity;
+
+        // Auto-connect on page load
+        window.addEventListener('load', () => {
+            logActivity('Page loaded. Click "Connect" to start.', 'info');
+        });
+
+        // Update metrics periodically
+        setInterval(updateMetrics, 1000);
+    </script>
+</body>
+</html>

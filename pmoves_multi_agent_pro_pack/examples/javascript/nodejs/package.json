@@ -1,0 +1,30 @@
+{
+  "name": "docling-mcp-nodejs-examples",
+  "version": "1.0.0",
+  "description": "Docling MCP Node.js client examples",
+  "main": "basic-client.js",
+  "scripts": {
+    "start": "node basic-client.js",
+    "test": "node test-client.js",
+    "batch-example": "node batch-processing.js",
+    "streaming-example": "node streaming-client.js",
+    "performance-test": "node performance-test.js"
+  },
+  "dependencies": {
+    "eventsource": "^2.0.2",
+    "axios": "^1.6.0",
+    "ws": "^8.14.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.0"
+  },
+  "keywords": [
+    "mcp",
+    "docling",
+    "document-processing",
+    "nodejs",
+    "examples"
+  ],
+  "author": "PMOVES Team",
+  "license": "MIT"
+}

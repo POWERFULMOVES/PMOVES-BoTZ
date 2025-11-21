@@ -1,0 +1,9 @@
+version: "3.9"
+
+# PMOVES-BoTZ Cipher overlay
+# This overlay currently does not add additional services beyond those defined
+# in core/docker-compose/base.yml. It exists to keep compose includes for
+# Cipher consistent across scripts and documentation.
+
+services: {}
+

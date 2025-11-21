@@ -1,0 +1,261 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Docling MCP Server Configuration",
+  "description": "Configuration schema for Docling MCP Server",
+  "type": "object",
+  "properties": {
+    "server": {
+      "type": "object",
+      "description": "Server configuration",
+      "properties": {
+        "host": {
+          "type": "string",
+          "description": "Server host address",
+          "default": "0.0.0.0"
+        },
+        "port": {
+          "type": "integer",
+          "description": "Server port number",
+          "minimum": 1,
+          "maximum": 65535,
+          "default": 3020
+        },
+        "transport": {
+          "type": "string",
+          "description": "Transport type",
+          "enum": ["stdio", "http"],
+          "default": "stdio"
+        },
+        "name": {
+          "type": "string",
+          "description": "Server name",
+          "default": "docling-mcp"
+        }
+      },
+      "additionalProperties": false
+    },
+    "logging": {
+      "type": "object",
+      "description": "Logging configuration",
+      "properties": {
+        "level": {
+          "type": "string",
+          "description": "Logging level",
+          "enum": ["DEBUG", "INFO", "WARNING", "ERROR"],
+          "default": "INFO"
+        },
+        "format": {
+          "type": "string",
+          "description": "Log message format",
+          "default": "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+        },
+        "name": {
+          "type": "string",
+          "description": "Logger name",
+          "default": "docling-mcp"
+        },
+        "output": {
+          "type": "string",
+          "description": "Log output destination",
+          "default": "stdout"
+        }
+      },
+      "additionalProperties": false
+    },
+    "sse": {
+      "type": "object",
+      "description": "Server-Sent Events configuration",
+      "properties": {
+        "endpoint": {
+          "type": "string",
+          "description": "SSE endpoint path",
+          "default": "/mcp"
+        },
+        "keepalive_interval": {
+          "type": "number",
+          "description": "Keepalive interval in seconds",
+          "minimum": 0.01,
+          "default": 0.1
+        },
+        "connection_timeout": {
+          "type": "number",
+          "description": "Connection timeout in seconds",
+          "minimum": 1,
+          "default": 30
+        },
+        "max_queue_size": {
+          "type": "integer",
+          "description": "Maximum queue size",
+          "minimum": 1,
+          "default": 1000
+        },
+        "cors_origins": {
+          "type": "array",
+          "description": "CORS allowed origins",
+          "items": {
+            "type": "string"
+          },
+          "default": ["*"]
+        },
+        "cors_methods": {
+          "type": "array",
+          "description": "CORS allowed methods",
+          "items": {
+            "type": "string"
+          },
+          "default": ["GET", "OPTIONS"]
+        },
+        "cors_headers": {
+          "type": "array",
+          "description": "CORS allowed headers",
+          "items": {
+            "type": "string"
+          },
+          "default": ["Content-Type", "Accept", "Cache-Control"]
+        },
+        "cors_max_age": {
+          "type": "integer",
+          "description": "CORS max age in seconds",
+          "minimum": 0,
+          "default": 86400
+        }
+      },
+      "additionalProperties": false
+    },
+    "performance": {
+      "type": "object",
+      "description": "Performance configuration",
+      "properties": {
+        "tool_timeout": {
+          "type": "number",
+          "description": "Tool execution timeout in seconds",
+          "minimum": 1,
+          "default": 30
+        },
+        "max_connections": {
+          "type": "integer",
+          "description": "Maximum number of connections",
+          "minimum": 1,
+          "default": 100
+        },
+        "rate_limit_requests": {
+          "type": "integer",
+          "description": "Rate limit requests per window",
+          "minimum": 1,
+          "default": 1000
+        },
+        "rate_limit_window": {
+          "type": "integer",
+          "description": "Rate limit window in seconds",
+          "minimum": 1,
+          "default": 3600
+        }
+      },
+      "additionalProperties": false
+    },
+    "security": {
+      "type": "object",
+      "description": "Security configuration",
+      "properties": {
+        "enable_cors": {
+          "type": "boolean",
+          "description": "Enable CORS",
+          "default": true
+        },
+        "allowed_origins": {
+          "type": "array",
+          "description": "Allowed origins for CORS",
+          "items": {
+            "type": "string"
+          },
+          "default": ["*"]
+        },
+        "enable_rate_limiting": {
+          "type": "boolean",
+          "description": "Enable rate limiting",
+          "default": false
+        },
+        "max_request_size": {
+          "type": "integer",
+          "description": "Maximum request size in bytes",
+          "minimum": 1,
+          "default": 10485760
+        }
+      },
+      "additionalProperties": false
+    },
+    "docling": {
+      "type": "object",
+      "description": "Docling integration configuration",
+      "properties": {
+        "cache_dir": {
+          "type": "string",
+          "description": "Cache directory path",
+          "default": "/data/cache"
+        },
+        "enable_cache": {
+          "type": "boolean",
+          "description": "Enable caching",
+          "default": true
+        },
+        "max_file_size": {
+          "type": "integer",
+          "description": "Maximum file size in bytes",
+          "minimum": 1,
+          "default": 104857600
+        },
+        "supported_formats": {
+          "type": "array",
+          "description": "Supported document formats",
+          "items": {
+            "type": "string"
+          },
+          "default": ["pdf", "docx", "pptx", "xlsx", "html", "txt", "md"]
+        },
+        "pipeline_options": {
+          "type": "object",
+          "description": "Additional Docling pipeline options",
+          "default": {}
+        }
+      },
+      "additionalProperties": false
+    },
+    "health_check": {
+      "type": "object",
+      "description": "Health check configuration",
+      "properties": {
+        "endpoint": {
+          "type": "string",
+          "description": "Health check endpoint path",
+          "default": "/health"
+        },
+        "interval": {
+          "type": "integer",
+          "description": "Health check interval in seconds",
+          "minimum": 1,
+          "default": 30
+        },
+        "timeout": {
+          "type": "integer",
+          "description": "Health check timeout in seconds",
+          "minimum": 1,
+          "default": 10
+        },
+        "retries": {
+          "type": "integer",
+          "description": "Number of health check retries",
+          "minimum": 0,
+          "default": 3
+        },
+        "start_period": {
+          "type": "integer",
+          "description": "Health check start period in seconds",
+          "minimum": 0,
+          "default": 30
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

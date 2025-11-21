@@ -1,0 +1,63 @@
+FROM python:3.11-slim
+
+WORKDIR /app
+
+# Install system dependencies for Python and Node.js
+RUN apt-get update && apt-get install -y \
+    gcc \
+    curl \
+    git \
+    python3-venv \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Node.js 20.x
+RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - && \
+    apt-get install -y nodejs
+
+# Install pnpm
+RUN npm install -g pnpm
+
+# Copy the pmoves_cipher directory
+COPY pmoves_cipher/ ./pmoves_cipher/
+
+# Build the JavaScript part
+WORKDIR /app/pmoves_cipher
+ENV CI=true
+RUN pnpm install --no-frozen-lockfile && \
+    pnpm add logform && \
+    pnpm run build && \
+    cp .env.example .env && \
+    cp .env.example dist/.env || true
+
+# Back to the main app directory
+WORKDIR /app
+
+# Copy the Python requirements
+COPY requirements.cipher.txt .
+
+# Create a virtual environment and install Python dependencies
+RUN python3 -m venv /app/venv && \
+    . /app/venv/bin/activate && \
+    pip install --no-cache-dir -r requirements.cipher.txt
+
+# Copy the MCP server code
+COPY app_cipher_memory.py .
+
+# Create data directory for SQLite database
+RUN mkdir -p /data
+
+# Set environment variables
+ENV PYTHONUNBUFFERED=1
+ENV MCP_MEMORY_DB_PATH=/data/memory.db
+ENV VENICE_API_KEY=${VENICE_API_KEY}
+ENV CIPHER_CONFIG_PATH=/app/pmoves_cipher/memAgent/cipher_pmoves.yml
+ENV PMOVES_ROOT=/app
+
+# No port exposure needed for stdio transport
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD python -c "import sqlite3; sqlite3.connect('/data/memory.db').close()" || exit 1
+
+# Run the MCP server
+CMD ["/app/venv/bin/python", "app_cipher_memory.py"]

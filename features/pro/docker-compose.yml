@@ -1,22 +1,9 @@
-version: '3.9'
+version: "3.9"
 
-services:
-  # E2B sandbox runner shim (HTTP) — uses E2B Python SDK
-  e2b-runner:
-    build: ./features/pro/e2b_shim
-    environment:
-      E2B_API_KEY: ${E2B_API_KEY}
-      SANDBOX_TTL_SEC: ${SANDBOX_TTL_SEC:-1800}
-    ports: [ "7071:7071" ]
-    restart: unless-stopped
+# PMOVES-BoTZ "pro" overlay
+# This overlay is intentionally minimal for now and exists
+# primarily to satisfy compose includes from bring_up_pmoves_botz.*
+# Additional pro-only services can be layered here as needed.
 
-  # Vision-Language sentinel (guidance/monitoring) — pluggable provider
-  vl-sentinel:
-    build: ./features/pro/vl_sentinel
-    environment:
-      VL_PROVIDER: ${VL_PROVIDER:-ollama}
-      VL_MODEL: ${VL_MODEL:-qwen2.5-vl:14b}
-      OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://host.docker.internal:11434}
-      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
-    ports: [ "7072:7072" ]
-    restart: unless-stopped
+services: {}
+

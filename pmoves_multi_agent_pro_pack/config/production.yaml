@@ -1,0 +1,82 @@
+# Production configuration for Docling MCP Server
+# This file overrides default settings for production deployment
+# IMPORTANT: Review and customize all settings before deploying to production
+
+logging:
+  level: "WARNING"  # Less verbose logging in production
+  output: "/var/log/docling-mcp.log"  # Log to file in production
+
+performance:
+  tool_timeout: 30.0  # Standard timeout for production
+  max_connections: 200  # Higher connection limit for production
+  rate_limit_requests: 500  # Stricter rate limiting
+  rate_limit_window: 3600  # 1 hour window
+
+security:
+  enable_cors: true
+  # IMPORTANT: Specify actual allowed origins in production
+  # Do NOT use wildcard "*" in production
+  allowed_origins:
+    - "https://your-domain.com"
+    - "https://app.your-domain.com"
+  enable_rate_limiting: true  # Enable rate limiting in production
+  max_request_size: 52428800  # 50MB limit for production
+
+docling:
+  enable_cache: true
+  cache_dir: "/data/cache"  # Production cache directory
+  max_file_size: 52428800  # 50MB limit for production
+  # Supported formats (can be restricted in production)
+  supported_formats:
+    - "pdf"
+    - "docx"
+    - "pptx"
+    - "xlsx"
+    - "html"
+    - "txt"
+    - "md"
+
+health_check:
+  interval: 60  # Less frequent health checks
+  timeout: 15  # Longer timeout
+  retries: 5  # More retries
+  start_period: 60  # Longer start period
+
+metrics:
+  enabled: true
+  collection_interval: 30.0  # Less frequent collection in production
+  retention_hours: 168  # 7 days retention in production
+  storage_backend: "file"  # Use file storage for persistence
+  storage_path: "/data/metrics"  # Production metrics storage
+  prometheus_enabled: true
+  prometheus_port: 9090
+  prometheus_endpoint: "/metrics"
+  dashboard_enabled: true
+  dashboard_port: 8080
+  dashboard_endpoint: "/dashboard"
+  alerting_enabled: true
+  alert_thresholds:
+    cpu_usage_percent:
+      warning: 60.0  # Lower thresholds for production
+      critical: 75.0
+    memory_usage_percent:
+      warning: 70.0
+      critical: 85.0
+    response_time_p95:
+      warning: 500.0  # Lower thresholds for production
+      critical: 1000.0
+    error_rate:
+      warning: 2.0
+      critical: 5.0
+    connection_errors:
+      warning: 5
+      critical: 20
+    tool_timeout_rate:
+      warning: 1.0
+      critical: 3.0
+  export_formats:
+    - "json"
+    - "csv"
+  export_interval: 900  # 15 minutes in production
+  compression_enabled: true
+  compression_threshold: 500  # Compress sooner in production

@@ -1,58 +1,179 @@
-version: '3.9'
+version: "3.9"
 
-x-common-env: &common_env
-  - TS_AUTHKEY=${TS_AUTHKEY}
-  - TS_STATE_DIR=/var/lib/tailscale
+x-env-files: &env_files
+  - ./env.shared
+  - ../../.env
+  - ../../.env.local
 
 services:
   tailscale:
     image: tailscale/tailscale:stable
-    hostname: pmoves-core
-    environment: *common_env
-    cap_add: [ "NET_ADMIN", "NET_RAW" ]
+    hostname: ${TAILSCALE_HOSTNAME:-pmoves}
+    environment:
+      - TS_AUTHKEY=${TS_AUTHKEY}
+      - TS_STATE_DIR=/var/lib/tailscale
+      - TS_USERSPACE=${TS_USERSPACE:-false}
+      - TS_ACCEPT_DNS=${TS_ACCEPT_DNS:-true}
+      - TS_SOCKET_DIR=/var/run/tailscale
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
+      - SYS_MODULE
+    devices:
+      - /dev/net/tun:/dev/net/tun
     volumes:
-      - ./core/ts-state:/var/lib/tailscale
-    network_mode: host
+      - ../ts-state:/var/lib/tailscale
+      - ../tailscale_final.sh:/tailscale_final.sh:ro
     restart: unless-stopped
     command: >
       sh -lc "
-      tailscaled --state=/var/lib/tailscale/tailscaled.state &
-      sleep 2 &&
-      tailscale up --authkey=${TS_AUTHKEY} --reset --accept-routes=true --ssh=true &&
-      tailscale serve https / http://127.0.0.1:2091 &&
+      tailscaled --state=/var/lib/tailscale/tailscaled.state & 
+      sleep 2 && 
+      tailscale up --authkey=${TS_AUTHKEY} --reset --accept-routes=true --ssh=true && 
+      tailscale serve https / http://127.0.0.1:${MCP_GATEWAY_PORT:-2091} && 
       tail -f /dev/null
       "
+    healthcheck:
+      test: ["CMD", "sh", "-c", "tailscale status || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
 
   mcp-gateway:
-    image: alpine:3.20
-    working_dir: /app
+    build:
+      context: ../../features/gateway
+    env_file: *env_files
     environment:
-      - POSTMAN_API_KEY=${POSTMAN_API_KEY}
+      MCP_CATALOG_PATH: /app/mcp_catalog.yml
     volumes:
-      - ./core/mcp_catalog.yaml:/app/mcp_catalog.yaml:ro
-    network_mode: host
+      - ../../core/mcp/catalog.yml:/app/mcp_catalog.yml:ro
+    ports:
+      - "${MCP_GATEWAY_PORT:-2091}:8000"
     restart: unless-stopped
-    command: >
-      "
-      apk add --no-cache bash curl python3 py3-pip pipx docker-cli-plugins &&
-      pipx ensurepath &&
-      docker mcp gateway run --port 2091 --transport streaming --catalog /app/mcp_catalog.yaml
-      "
+    depends_on:
+      docling-mcp:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
 
-  # Docling MCP as standalone HTTP server
   docling-mcp:
-    image: python:3.11-slim
+    build:
+      context: ../..
+      dockerfile: features/docling/Dockerfile.docling-mcp
     working_dir: /srv
     environment:
-      # optional: cache dir for big docs
+      DOCLING_MCP_SERVER__TRANSPORT: ${DOCLING_MCP_TRANSPORT:-http}
+      DOCLING_MCP_SERVER__HOST: ${DOCLING_MCP_HOST:-0.0.0.0}
+      DOCLING_MCP_SERVER__PORT: ${DOCLING_MCP_PORT:-3020}
+      DOCLING_MCP_LOGGING__LEVEL: ${DOCLING_MCP_LOG_LEVEL:-INFO}
+      DOCLING_MCP_DOCLING__CACHE_DIR: /data/cache
+      DOCLING_MCP_ENVIRONMENT: ${DOCLING_MCP_ENVIRONMENT:-production}
       DOC_CACHE_DIR: /data/cache
     volumes:
-      - ./data/docling:/data
-    command: >
-      sh -lc "
-      pip install --no-cache-dir docling-mcp &&
-      docling-mcp-server --transport streamable-http --host 0.0.0.1 --port 3020
-      "
+      - ../../data/docling:/data
+      - ../../features/docling:/srv/docling
+      - ../../config:/srv/config:ro
+      - docling_logs:/var/log
     ports:
-      - "3020:3020"
+      - "${DOCLING_MCP_PORT:-3020}:${DOCLING_MCP_PORT:-3020}"
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:${DOCLING_MCP_PORT:-3020}/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  e2b-runner:
+    build: ../../features/e2b
+    environment:
+      E2B_API_KEY: ${E2B_API_KEY}
+      SANDBOX_TTL_SEC: ${SANDBOX_TTL_SEC:-1800}
+    ports:
+      - "${E2B_RUNNER_PORT:-7071}:7071"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:7071/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  vl-sentinel:
+    build: ../../features/vl_sentinel
+    environment:
+      VL_PROVIDER: ${VL_PROVIDER:-ollama}
+      VL_MODEL: ${VL_MODEL:-qwen2.5-vl:14b}
+      OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://host.docker.internal:11434}
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+    ports:
+      - "${VL_SENTINEL_PORT:-7072}:7072"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:7072/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  cipher-memory:
+    build:
+      context: ../../features/cipher/pmoves_cipher
+      dockerfile: Dockerfile
+    environment:
+      VENICE_API_KEY: ${VENICE_API_KEY}
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      NODE_ENV: production
+      PORT: ${CIPHER_API_PORT:-3011}
+      CONFIG_FILE: /app/memAgent/cipher.yml
+      CIPHER_ENCRYPTION_KEY: ${CIPHER_ENCRYPTION_KEY:-0000000000000000000000000000000000000000000000000000000000000000}
+    volumes:
+      - cipher_data:/data
+    ports:
+      - "${CIPHER_API_PORT:-3011}:${CIPHER_API_PORT:-3011}"
+    restart: unless-stopped
+
+  crush-shim:
+    image: python:3.11-slim
+    env_file: *env_files
+    working_dir: /srv
+    environment:
+      PYTHONUNBUFFERED: "1"
+    volumes:
+      - ../../:/srv:ro
+    command: >
+      sh -lc "pip install --no-cache-dir fastapi uvicorn[standard] pydantic requests pipx &&
+              python features/crush"
+    ports:
+      - "${CRUSH_PORT:-7069}:7069"
+    restart: unless-stopped
+    labels:
+      pmoves.service: crush
+      pmoves.health: http://crush-shim:7069/health/services
+
+  postman-mcp-local:
+    image: node:20-alpine
+    working_dir: /srv
+    environment:
+      POSTMAN_API_KEY: ${POSTMAN_API_KEY}
+      POSTMAN_API_BASE_URL: https://api.postman.com
+    entrypoint: ["sh","-lc"]
+    command: >
+      "sh -lc 'while true; do echo \"Starting Postman MCP server...\"; npx @postman/postman-mcp-server@latest --full || echo \"Postman MCP server exited, will restart in 30 seconds...\"; sleep 30; done'"
+    network_mode: host
+    restart: unless-stopped
+
+volumes:
+  cipher_data:
+  docling_logs:
+  ts-state:
+
+networks:
+  default:
+    name: pmoves_default
+    external: true

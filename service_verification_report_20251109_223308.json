@@ -1,0 +1,230 @@
+{
+  "verification_summary": {
+    "timestamp": "2025-11-09T22:33:08.333647",
+    "total_services": 7,
+    "passed_services": 3,
+    "failed_services": 4,
+    "success_rate": "42.9%",
+    "target_success_rate": "100%",
+    "improvement_needed": true
+  },
+  "services": {
+    "mcp-gateway": {
+      "service": "mcp-gateway",
+      "description": "MCP Gateway service",
+      "expected_status": "healthy",
+      "timestamp": "2025-11-09T22:33:06.225622",
+      "checks": {
+        "container": {
+          "status": "pass",
+          "details": "Up 2 hours (unhealthy)"
+        },
+        "health": {
+          "status": "fail",
+          "details": "HTTP 404",
+          "data": {
+            "raw_response": "Not Found"
+          }
+        },
+        "functionality": {
+          "status": "fail",
+          "details": "Tools endpoint: 404"
+        }
+      },
+      "overall_status": "fail",
+      "pass_rate": "1/3"
+    },
+    "docling-mcp": {
+      "service": "docling-mcp",
+      "description": "Docling MCP service",
+      "expected_status": "healthy",
+      "timestamp": "2025-11-09T22:33:06.396288",
+      "checks": {
+        "container": {
+          "status": "pass",
+          "details": "Up About an hour (healthy)"
+        },
+        "health": {
+          "status": "pass",
+          "details": "HTTP 200",
+          "data": {
+            "status": "healthy",
+            "timestamp": "2025-11-10T03:33:04.671575",
+            "docling_available": true,
+            "metrics_available": false,
+            "uptime_seconds": 0
+          }
+        },
+        "functionality": {
+          "status": "pass",
+          "details": "Docling healthy: healthy"
+        }
+      },
+      "overall_status": "pass",
+      "pass_rate": "3/3"
+    },
+    "e2b-runner": {
+      "service": "e2b-runner",
+      "description": "E2B Runner service",
+      "expected_status": "healthy",
+      "timestamp": "2025-11-09T22:33:06.524406",
+      "checks": {
+        "container": {
+          "status": "pass",
+          "details": "Up About an hour (unhealthy)"
+        },
+        "health": {
+          "status": "pass",
+          "details": "HTTP 200",
+          "data": {
+            "status": "healthy",
+            "service": "e2b-runner"
+          }
+        },
+        "functionality": {
+          "status": "pass",
+          "details": "E2B health endpoint responding"
+        }
+      },
+      "overall_status": "pass",
+      "pass_rate": "3/3"
+    },
+    "vl-sentinel": {
+      "service": "vl-sentinel",
+      "description": "VL Sentinel service",
+      "expected_status": "healthy",
+      "timestamp": "2025-11-09T22:33:06.657051",
+      "checks": {
+        "container": {
+          "status": "pass",
+          "details": "Up 26 minutes (unhealthy)"
+        },
+        "health": {
+          "status": "pass",
+          "details": "HTTP 200",
+          "data": {
+            "status": "healthy",
+            "provider": "ollama",
+            "model": "qwen3-vl:235b-cloud"
+          }
+        },
+        "functionality": {
+          "status": "pass",
+          "details": "VL Sentinel healthy: healthy"
+        }
+      },
+      "overall_status": "pass",
+      "pass_rate": "3/3"
+    },
+    "cipher-memory": {
+      "service": "cipher-memory",
+      "description": "Cipher Memory service (STDIO)",
+      "expected_status": "stdio_running",
+      "timestamp": "2025-11-09T22:33:06.823577",
+      "checks": {
+        "container": {
+          "status": "fail",
+          "details": "Container not found"
+        },
+        "stdio": {
+          "status": "fail",
+          "details": "Container not running: Container not found"
+        },
+        "functionality": {
+          "status": "pass",
+          "details": "Basic functionality test not applicable"
+        }
+      },
+      "overall_status": "fail",
+      "pass_rate": "1/3"
+    },
+    "postman-mcp-local": {
+      "service": "postman-mcp-local",
+      "description": "Postman MCP Local service (process-based)",
+      "expected_status": "process_running",
+      "timestamp": "2025-11-09T22:33:07.042102",
+      "checks": {
+        "container": {
+          "status": "fail",
+          "details": "Container not found"
+        },
+        "process": {
+          "status": "fail",
+          "details": "Container not running: Container not found"
+        },
+        "functionality": {
+          "status": "pass",
+          "details": "Basic functionality test not applicable"
+        }
+      },
+      "overall_status": "fail",
+      "pass_rate": "1/3"
+    },
+    "tailscale": {
+      "service": "tailscale",
+      "description": "Tailscale VPN service",
+      "expected_status": "vpn_connected",
+      "timestamp": "2025-11-09T22:33:07.262052",
+      "checks": {
+        "container": {
+          "status": "fail",
+          "details": "Container not found"
+        },
+        "vpn": {
+          "status": "fail",
+          "details": "VPN container not running: Container not found"
+        },
+        "functionality": {
+          "status": "pass",
+          "details": "Basic functionality test not applicable"
+        }
+      },
+      "overall_status": "fail",
+      "pass_rate": "1/3"
+    }
+  },
+  "error_logs": {
+    "mcp-gateway": {
+      "error_count": 0,
+      "has_errors": false,
+      "recent_errors": []
+    },
+    "docling-mcp": {
+      "error_count": 0,
+      "has_errors": false,
+      "recent_errors": []
+    },
+    "e2b-runner": {
+      "error_count": 0,
+      "has_errors": false,
+      "recent_errors": []
+    },
+    "vl-sentinel": {
+      "error_count": 0,
+      "has_errors": false,
+      "recent_errors": []
+    },
+    "cipher-memory": {
+      "error_count": 0,
+      "has_errors": false,
+      "log_access_error": "Error response from daemon: No such container: pmoves_multi_agent_pro_pack-cipher-memory-1\n"
+    },
+    "postman-mcp-local": {
+      "error_count": 0,
+      "has_errors": false,
+      "log_access_error": "Error response from daemon: No such container: pmoves_multi_agent_pro_plus_pack-postman-mcp-local-1\n"
+    },
+    "tailscale": {
+      "error_count": 0,
+      "has_errors": false,
+      "recent_errors": []
+    }
+  },
+  "recommendations": [
+    "Fix MCP Gateway health endpoint - currently returning 404. Check if /health route is properly implemented in gateway.py",
+    "Start Cipher Memory service - container not found. Run: docker-compose -f docker-compose.mcp-pro.yml up cipher-memory",
+    "Start Postman MCP Local service - container not found. Run: docker-compose -f docker-compose.mcp-pro.local-postman.yml up postman-mcp-local",
+    "Check Tailscale authentication - verify TAILSCALE_AUTHKEY is valid and Tailscale service can connect to network",
+    "Overall: 4 services need attention to achieve 100% success rate"
+  ]
+}

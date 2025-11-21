@@ -1,9 +1,8 @@
 #!/usr/bin/env python3
 """
-PMOVES Staging Deployment Script
-Deploys and verifies agent packs in staging environment.
-Usage: python scripts/stage_deploy.py [pack_name]
-Packs: mini, multi, pro, pro_plus
+PMOVES-BoTZ Staging Deployment Script
+Deploys and verifies the unified PMOVES-BoTZ stack in a staging environment.
+Usage: python scripts/stage_deploy.py
 """
 
 import os
@@ -25,35 +24,23 @@ class StageDeployer:
         timestamp = time.strftime('%H:%M:%S')
         print(f"[{timestamp}] {status}: {message}")
 
-    def get_pack_config(self, pack_name):
-        """Get pack-specific configuration"""
-        packs = {
-            'mini': {
-                'dir': 'pmoves-mini-agent-box',
-                'compose_files': ['docker-compose.pmoves-mini.staging.yml'],
-                'services': ['crush-shim', 'discord-bot'],
-                'health_checks': []
-            },
-            'multi': {
-                'dir': 'pmoves_multi_agent_pack',
-                'compose_files': ['docker-compose.pmoves-multi.yml'],
-                'services': ['docling-mcp', 'postman-mcp'],
-                'health_checks': ['http://localhost:3020/health', 'http://localhost:3021/health']
-            },
-            'pro': {
-                'dir': 'pmoves_multi_agent_pro_pack',
-                'compose_files': ['docker-compose.mcp-pro.yml'],
-                'services': ['e2b-shim', 'vl-sentinel'],
-                'health_checks': ['http://localhost:3022/health', 'http://localhost:3023/health']
-            },
-            'pro_plus': {
-                'dir': 'pmoves_multi_agent_pro_plus_pack',
-                'compose_files': ['docker-compose.mcp-pro.local-postman.yml', 'docker-compose.mcp-pro.vlm.yml'],
-                'services': ['postman-mcp-local', 'docling-mcp'],
-                'health_checks': ['http://localhost:3024/health']
-            }
+    def get_pack_config(self, pack_name=None):
+        """Get unified BoTZ configuration (pack_name kept for backwards compatibility, ignored)."""
+        return {
+            'dir': '.',
+            'compose_files': [
+                'core/docker-compose/base.yml',
+                'features/pro/docker-compose.yml',
+                'features/network/external.yml',
+                'features/metrics/docker-compose.yml',
+                'features/cipher/docker-compose.yml',
+            ],
+            'services': ['mcp-gateway', 'docling-mcp', 'cipher-memory'],
+            'health_checks': [
+                'http://localhost:2091/ready',
+                'http://localhost:3020/health',
+            ],
         }
-        return packs.get(pack_name)
 
     def run_pre_deploy_checks(self):
         """Run pre-deployment validation"""
@@ -140,29 +127,21 @@ class StageDeployer:
         return True
 
     def deploy_all_packs(self):
-        """Deploy all packs sequentially"""
-        packs = ['mini', 'multi', 'pro', 'pro_plus']
+        """Deploy unified stack (backwards-compatible entrypoint)."""
         results = {}
-
-        for pack in packs:
-            self.log(f"Deploying {pack} pack...")
-            pack_config = self.get_pack_config(pack)
-            if not pack_config:
-                self.log(f"Unknown pack: {pack}", "FAIL")
+        pack = 'botz-unified'
+        self.log(f"Deploying {pack} ...")
+        pack_config = self.get_pack_config(pack)
+        try:
+            if self.deploy_pack(pack_config) and self.run_post_deploy_tests(pack_config):
+                results[pack] = True
+                self.log(f"{pack} deployed successfully", "PASS")
+            else:
                 results[pack] = False
-                continue
-
-            try:
-                if self.deploy_pack(pack_config) and self.run_post_deploy_tests(pack_config):
-                    results[pack] = True
-                    self.log(f"{pack} pack deployed successfully", "PASS")
-                else:
-                    results[pack] = False
-                    self.log(f"{pack} pack deployment failed", "FAIL")
-            except Exception as e:
-                self.log(f"Error deploying {pack}: {e}", "FAIL")
-                results[pack] = False
-
+                self.log(f"{pack} deployment failed", "FAIL")
+        except Exception as e:
+            self.log(f"Error deploying {pack}: {e}", "FAIL")
+            results[pack] = False
         return results
 
     def run_deployment(self):
@@ -192,18 +171,18 @@ class StageDeployer:
         return success
 
 def main():
-    parser = argparse.ArgumentParser(description='PMOVES Staging Deployment')
-    parser.add_argument('pack', nargs='?', help='Pack to deploy (mini, multi, pro, pro_plus)')
+    parser = argparse.ArgumentParser(description='PMOVES-BoTZ Staging Deployment')
+    parser.add_argument('pack', nargs='?', help='(deprecated) pack to deploy; ignored, unified stack is always used')
     args = parser.parse_args()
 
     deployer = StageDeployer(args.pack)
     success = deployer.run_deployment()
 
     if success:
-        print("\n✅ Staging deployment completed successfully!")
+        print("\n[SUCCESS] Staging deployment completed successfully!")
         print("Run 'python scripts/smoke_tests.py' to verify functionality")
     else:
-        print("\n❌ Staging deployment failed!")
+        print("\n[FAILED] Staging deployment failed!")
         sys.exit(1)
 
 if __name__ == '__main__':

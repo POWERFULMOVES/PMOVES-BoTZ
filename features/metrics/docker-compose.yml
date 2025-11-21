@@ -1,0 +1,68 @@
+services:
+  prometheus:
+    image: prom/prometheus:latest
+    command: ["--config.file=/etc/prometheus/prometheus.yml", "--storage.tsdb.retention.time=15d", "--web.enable-lifecycle"]
+    volumes:
+      - ../../features/metrics/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ../../features/metrics/prometheus.rules.yml:/etc/prometheus/prometheus.rules.yml:ro
+      - prometheus_data:/prometheus
+      - ../../features/metrics/file_sd:/etc/prometheus/file_sd:ro
+    ports:
+      - "${PROMETHEUS_PORT:-9090}:9090"
+    restart: unless-stopped
+    networks:
+      default:
+        aliases: ["${PMZ_NAMESPACE:-pmoves-botz}_prom"]
+      pmoves_ai: {}
+
+  grafana:
+    image: grafana/grafana:11.3.0
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin}
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ../../features/metrics/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ../../features/metrics/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    ports:
+      - "${GRAFANA_PORT:-3033}:3000"
+    restart: unless-stopped
+    networks:
+      default:
+        aliases: ["${PMZ_NAMESPACE:-pmoves-botz}_grafana"]
+      pmoves_ai: {}
+  alertmanager:
+    image: prom/alertmanager:latest
+    ports:
+      - "${ALERTMANAGER_PORT:-9093}:9093"
+    volumes:
+      - ../../features/metrics/alertmanager.tmpl.yml:/etc/alertmanager/alertmanager.tmpl.yml:ro
+    environment:
+      SLACK_WEBHOOK_URL: ${SLACK_WEBHOOK_URL}
+      SLACK_CHANNEL: ${SLACK_CHANNEL:-#alerts}
+      GRAFANA_BASE_URL: ${GRAFANA_BASE_URL:-http://localhost:${GRAFANA_PORT:-3033}}
+    command: ["/bin/sh","-lc","envsubst < /etc/alertmanager/alertmanager.tmpl.yml > /etc/alertmanager/alertmanager.yml && /bin/alertmanager --config.file=/etc/alertmanager/alertmanager.yml --storage.path=/alertmanager"]
+    restart: unless-stopped
+    networks:
+      default: {}
+      pmoves_ai: {}
+
+  alertmanager-discord:
+    image: benjojo/alertmanager-discord:latest
+    environment:
+      DISCORD_WEBHOOK: ${DISCORD_WEBHOOK_URL}
+    expose: ["9094"]
+    restart: unless-stopped
+    networks:
+      default: {}
+      pmoves_ai: {}
+networks:
+  default:
+    name: ${PMZ_NAMESPACE:-pmoves-botz}_net
+  pmoves_ai:
+    external: true
+    name: ${PMOVES_AI_NETWORK:-pmoves-net}
+
+volumes:
+  prometheus_data:
+  grafana_data:

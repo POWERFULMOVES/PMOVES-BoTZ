@@ -1,0 +1,40 @@
+groups:
+  - name: pmoves-health
+    interval: 30s
+    rules:
+      - alert: GatewayDown
+        expr: mcp_proxy_up == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "MCP Gateway is down"
+          description: "mcp_proxy_up=0 for over 2 minutes."
+
+      - alert: DoclingDown
+        expr: docling_mcp_up == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Docling MCP is down"
+          description: "docling_mcp_up=0 for over 2 minutes."
+
+      - alert: GatewayHighErrorRate
+        expr: (sum(rate(http_requests_total{status=~"5.."}[5m])) by (path)) / clamp_min(sum(rate(http_requests_total[5m])) by (path), 1) > 0.05
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Gateway HTTP 5xx > 5%"
+          description: "{{ $labels.path }} has 5xx error ratio > 5% for 10m."
+
+      - alert: ServiceProbeFail
+        expr: probe_success{job="blackbox"} == 0
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Blackbox probe failed"
+          description: "{{ $labels.service }} probe {{ $labels.instance }} failing for 2m."
+

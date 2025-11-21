@@ -1,0 +1,22 @@
+# MCP SDK and related dependencies
+mcp>=1.21.0
+aiohttp>=3.9.0
+
+# Configuration management
+pyyaml>=6.0.1
+
+# Docling dependencies (will be installed from local submodule)
+# docling>=2.0.0  # Commented out as we install from local submodule
+
+# Additional utilities
+typing-extensions>=4.8.0
+pathlib2>=2.3.7  # For older Python compatibility
+
+# Metrics and monitoring dependencies
+psutil>=5.9.0  # System resource monitoring
+jinja2>=3.1.0  # Template engine for dashboard
+prometheus-client>=0.20.0  # Prometheus metrics export
+
+# Optional: For enhanced logging and monitoring
+# structlog>=23.1.0
+# prometheus-client>=0.17.0  # For metrics if needed

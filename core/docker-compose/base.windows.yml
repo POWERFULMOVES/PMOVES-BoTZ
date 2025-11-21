@@ -1,0 +1,17 @@
+networks:
+  default:
+    name: ${PMZ_NAMESPACE:-pmoves-botz}_net
+  pmoves_ai:
+    name: ${PMZ_NAMESPACE:-pmoves-botz}_ai
+
+services:
+  # Disable or replace Linux-only services on Windows/macOS
+  tailscale:
+    profiles: ["linux"]
+    deploy:
+      replicas: 0
+
+  # Ensure mcp-gateway is reachable without host networking
+  mcp-gateway:
+    ports:
+      - "2091:2091"

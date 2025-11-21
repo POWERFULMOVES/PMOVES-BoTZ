@@ -1,0 +1,16 @@
+services:
+  mcp-gateway:
+    ports: []
+    expose: ["8000"]
+  docling-mcp:
+    ports: []
+    expose: ["3020"]
+  e2b-runner:
+    ports: []
+    expose: ["7071"]
+  vl-sentinel:
+    ports: []
+    expose: ["7072"]
+  cipher-memory:
+    ports: []
+    expose: ["3010","3011"]

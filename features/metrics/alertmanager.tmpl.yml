@@ -1,0 +1,27 @@
+global:
+  resolve_timeout: 5m
+
+route:
+  group_by: ['job']
+  group_wait: 30s
+  group_interval: 5m
+  repeat_interval: 3h
+  receiver: 'slack-and-discord'
+
+receivers:
+  - name: slack-and-discord
+    slack_configs:
+      - send_resolved: true
+        api_url: ${SLACK_WEBHOOK_URL}
+        channel: ${SLACK_CHANNEL}
+        title: '[[{{ .Status | toUpper }}]] {{ .CommonLabels.alertname }}'
+        text: |
+          *Severity*: {{ .CommonLabels.severity }}
+          *Instance*: {{ .CommonLabels.instance }}
+          *Service*: {{ .CommonLabels.service }}
+          *Summary*: {{ .CommonAnnotations.summary }}
+          *Description*: {{ .CommonAnnotations.description }}
+          *Grafana*: ${GRAFANA_BASE_URL}/d/pmoves-health/pmoves-services-health
+    webhook_configs:
+      - send_resolved: true
+        url: http://alertmanager-discord:9094
