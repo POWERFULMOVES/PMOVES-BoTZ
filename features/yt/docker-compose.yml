@@ -1,20 +1,14 @@
 version: "3.9"
 
-# PMOVES.YT mini agent overlay
-# Optional service that can be enabled alongside the core BoTZ stack.
-
 services:
   yt-mini:
-    image: ${YT_MINI_IMAGE:-pmoves/yt-mini:dev}
-    ports:
-      - "${YT_MINI_PORT:-3050}:3050"
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: pmoves/yt-mini:dev
+    container_name: yt-mini
     environment:
       PMOVES_MODE: yt-mini
     restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3050/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 30s
-
+    # Keep alive for CLI usage
+    command: tail -f /dev/null
