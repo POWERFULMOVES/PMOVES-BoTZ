@@ -1,179 +1,137 @@
 version: "3.9"
 
-x-env-files: &env_files
-  - ./env.shared
-  - ../../.env
-  - ../../.env.local
-
 services:
+  # 1. Tailscale VPN (Network Layer)
   tailscale:
-    image: tailscale/tailscale:stable
-    hostname: ${TAILSCALE_HOSTNAME:-pmoves}
+    image: tailscale/tailscale:latest
+    hostname: ${TAILSCALE_HOSTNAME:-pmoves-botz}
     environment:
-      - TS_AUTHKEY=${TS_AUTHKEY}
+      - TS_AUTHKEY=${TAILSCALE_AUTHKEY}
+      - TS_EXTRA_ARGS=--advertise-tags=${TAILSCALE_TAGS}
       - TS_STATE_DIR=/var/lib/tailscale
-      - TS_USERSPACE=${TS_USERSPACE:-false}
-      - TS_ACCEPT_DNS=${TS_ACCEPT_DNS:-true}
-      - TS_SOCKET_DIR=/var/run/tailscale
+      - TS_USERSPACE=false
+    volumes:
+      - ${PWD}/ts-state:/var/lib/tailscale
+      - /dev/net/tun:/dev/net/tun
     cap_add:
       - NET_ADMIN
       - NET_RAW
-      - SYS_MODULE
-    devices:
-      - /dev/net/tun:/dev/net/tun
-    volumes:
-      - ../ts-state:/var/lib/tailscale
-      - ../tailscale_final.sh:/tailscale_final.sh:ro
     restart: unless-stopped
-    command: >
-      sh -lc "
-      tailscaled --state=/var/lib/tailscale/tailscaled.state & 
-      sleep 2 && 
-      tailscale up --authkey=${TS_AUTHKEY} --reset --accept-routes=true --ssh=true && 
-      tailscale serve https / http://127.0.0.1:${MCP_GATEWAY_PORT:-2091} && 
-      tail -f /dev/null
-      "
-    healthcheck:
-      test: ["CMD", "sh", "-c", "tailscale status || exit 1"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 30s
+    networks:
+      - pmoves_ai
 
+  # 2. MCP Gateway (Orchestrator)
   mcp-gateway:
-    build:
-      context: ../../features/gateway
-    env_file: *env_files
-    environment:
-      MCP_CATALOG_PATH: /app/mcp_catalog.yml
+    image: python:3.11-slim
+    working_dir: /app
     volumes:
-      - ../../core/mcp/catalog.yml:/app/mcp_catalog.yml:ro
-    ports:
-      - "${MCP_GATEWAY_PORT:-2091}:8000"
-    restart: unless-stopped
-    depends_on:
-      docling-mcp:
-        condition: service_healthy
+      - ../../features/gateway/python-gateway:/app
+    command: sh -c "pip install fastmcp && python gateway.py"
+    environment:
+      - PORT=2091
+    networks:
+      - pmoves_ai
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:2091/health')"]
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 40s
 
+  # 3. Docling MCP (Document Processing)
   docling-mcp:
     build:
-      context: ../..
-      dockerfile: features/docling/Dockerfile.docling-mcp
-    working_dir: /srv
+      context: ../../features/docling
+      dockerfile: Dockerfile.docling-mcp
+    command: python docling_mcp_server.py --transport streamable-http --port 3020
     environment:
-      DOCLING_MCP_SERVER__TRANSPORT: ${DOCLING_MCP_TRANSPORT:-http}
-      DOCLING_MCP_SERVER__HOST: ${DOCLING_MCP_HOST:-0.0.0.0}
-      DOCLING_MCP_SERVER__PORT: ${DOCLING_MCP_PORT:-3020}
-      DOCLING_MCP_LOGGING__LEVEL: ${DOCLING_MCP_LOG_LEVEL:-INFO}
-      DOCLING_MCP_DOCLING__CACHE_DIR: /data/cache
-      DOCLING_MCP_ENVIRONMENT: ${DOCLING_MCP_ENVIRONMENT:-production}
-      DOC_CACHE_DIR: /data/cache
-    volumes:
-      - ../../data/docling:/data
-      - ../../features/docling:/srv/docling
-      - ../../config:/srv/config:ro
-      - docling_logs:/var/log
-    ports:
-      - "${DOCLING_MCP_PORT:-3020}:${DOCLING_MCP_PORT:-3020}"
-    restart: unless-stopped
+      - PORT=3020
+    networks:
+      - pmoves_ai
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:${DOCLING_MCP_PORT:-3020}/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:3020/health"]
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 30s
 
+  # 4. E2B Runner (Sandbox Layer)
   e2b-runner:
-    build: ../../features/e2b
+    build:
+      context: ../../features/e2b
+      dockerfile: Dockerfile
+    working_dir: /app
+    volumes:
+      - ../../features/e2b:/app
+    command: uvicorn app_e2b:app --host 0.0.0.0 --port 7071
     environment:
-      E2B_API_KEY: ${E2B_API_KEY}
-      SANDBOX_TTL_SEC: ${SANDBOX_TTL_SEC:-1800}
-    ports:
-      - "${E2B_RUNNER_PORT:-7071}:7071"
-    restart: unless-stopped
+      - PORT=7071
+      - E2B_API_KEY=${E2B_API_KEY}
+    networks:
+      - pmoves_ai
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:7071/health"]
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:7071/health')"]
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 10s
 
+  # 5. VL Sentinel (Vision-Language Layer)
   vl-sentinel:
-    build: ../../features/vl_sentinel
+    build:
+      context: ../../features/vl_sentinel
+      dockerfile: Dockerfile
+    working_dir: /app
+    volumes:
+      - ../../features/vl_sentinel:/app
+    command: uvicorn app_vl:app --host 0.0.0.0 --port 7072
     environment:
-      VL_PROVIDER: ${VL_PROVIDER:-ollama}
-      VL_MODEL: ${VL_MODEL:-qwen2.5-vl:14b}
-      OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://host.docker.internal:11434}
-      OPENAI_API_KEY: ${OPENAI_API_KEY}
-    ports:
-      - "${VL_SENTINEL_PORT:-7072}:7072"
-    restart: unless-stopped
+      OLLAMA_BASE_URL: ""
+      PORT: "7072"
+    networks:
+      - pmoves_ai
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:7072/health"]
-      interval: 30s
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:7072/health')"]
       timeout: 10s
+      interval: 30s
       retries: 3
-      start_period: 10s
 
+  # 6. Cipher Memory (Data Layer)
   cipher-memory:
     build:
-      context: ../../features/cipher/pmoves_cipher
-      dockerfile: Dockerfile
+      context: ../../features/cipher
+      dockerfile: Dockerfile.cipher
     environment:
-      VENICE_API_KEY: ${VENICE_API_KEY}
-      OPENAI_API_KEY: ${OPENAI_API_KEY}
-      NODE_ENV: production
-      PORT: ${CIPHER_API_PORT:-3011}
-      CONFIG_FILE: /app/memAgent/cipher.yml
-      CIPHER_ENCRYPTION_KEY: ${CIPHER_ENCRYPTION_KEY:-0000000000000000000000000000000000000000000000000000000000000000}
+      - VENICE_API_KEY=${VENICE_API_KEY}
+      - CIPHER_CONFIG_PATH=/app/features/cipher/pmoves_cipher/memAgent/cipher_pmoves.yml
+      - CIPHER_MEMORY_PORT=${CIPHER_MEMORY_PORT:-8081}
     volumes:
+      - ../../features/cipher/pmoves_cipher:/app/features/cipher/pmoves_cipher:ro
       - cipher_data:/data
-    ports:
-      - "${CIPHER_API_PORT:-3011}:${CIPHER_API_PORT:-3011}"
-    restart: unless-stopped
-
-  crush-shim:
-    image: python:3.11-slim
-    env_file: *env_files
-    working_dir: /srv
-    environment:
-      PYTHONUNBUFFERED: "1"
-    volumes:
-      - ../../:/srv:ro
-    command: >
-      sh -lc "pip install --no-cache-dir fastapi uvicorn[standard] pydantic requests pipx &&
-              python features/crush"
-    ports:
-      - "${CRUSH_PORT:-7069}:7069"
-    restart: unless-stopped
     labels:
-      pmoves.service: crush
-      pmoves.health: http://crush-shim:7069/health/services
+      pmoves.service: "cipher"
+      pmoves.health: "http://cipher-memory:${CIPHER_MEMORY_PORT:-8081}/health"
+    networks:
+      default:
+        aliases: ["pmoves-botz_cipher", "cipher-memory"]
+      pmoves_ai: {}
 
-  postman-mcp-local:
-    image: node:20-alpine
-    working_dir: /srv
+  # 7. YT Mini Agent (YouTube/Media Layer)
+  yt-mini:
+    build:
+      context: ../../features/yt
+      dockerfile: Dockerfile
+    image: pmoves/yt-mini:dev
+    container_name: yt-mini
     environment:
-      POSTMAN_API_KEY: ${POSTMAN_API_KEY}
-      POSTMAN_API_BASE_URL: https://api.postman.com
-    entrypoint: ["sh","-lc"]
-    command: >
-      "sh -lc 'while true; do echo \"Starting Postman MCP server...\"; npx @postman/postman-mcp-server@latest --full || echo \"Postman MCP server exited, will restart in 30 seconds...\"; sleep 30; done'"
-    network_mode: host
+      PMOVES_MODE: yt-mini
     restart: unless-stopped
+    command: tail -f /dev/null
+    networks:
+      - pmoves_ai
 
 volumes:
   cipher_data:
-  docling_logs:
   ts-state:
 
 networks:
-  default:
-    name: pmoves_default
-    external: true
+  pmoves_ai:
+    name: pmoves_ai
+    driver: bridge

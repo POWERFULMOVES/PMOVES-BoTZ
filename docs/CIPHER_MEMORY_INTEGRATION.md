@@ -2,19 +2,19 @@
 
 ## Overview
 
-PMOVES-BoTZ now includes robust integration with Pmoves-cipher, providing advanced memory capabilities for multi-agent workflows. This integration enables persistent knowledge storage, reasoning pattern preservation, and cross-session learning.
+PMOVES-BoTZ now includes robust integration with Pmoves-cipher, providing advanced memory capabilities for multi-agent workflows. This integration enables persistent knowledge storage, reasoning pattern preservation, and cross-session learning. Cipher is a first-class, always-on service in the base stack (no optional overlay).
 
 ## Architecture
 
 ### Components
 
 1. **Pmoves-cipher Submodule**
-   - Location: `pmoves_multi_agent_pro_pack/memory_shim/pmoves_cipher/`
+   - Location: `features/cipher/pmoves_cipher/`
    - Forked from: https://github.com/POWERFULMOVES/Pmoves-cipher
    - Provides core memory management and vector storage capabilities
 
 2. **Cipher Memory MCP Server**
-   - Script: `pmoves_multi_agent_pro_pack/memory_shim/app_cipher_memory.py`
+   - Script: `features/cipher/app_cipher_memory.py`
    - Interfaces between PMOVES MCP architecture and cipher memory system
    - Exposes memory operations as MCP tools
 
@@ -24,9 +24,10 @@ PMOVES-BoTZ now includes robust integration with Pmoves-cipher, providing advanc
    - Enhanced `code_runner_mode.json`: Learning from code execution
 
 4. **Docker Integration**
-   - Service: `cipher-memory` in `docker-compose.mcp-pro.yml`
-   - Uses custom Dockerfile: `Dockerfile.cipher`
-   - Persistent storage via Docker volume
+   - Service: `cipher-memory` lives in `core/docker-compose/base.yml` (loaded by default). The compose build passes `BUILD_UI=true`, so both API and Web UI are baked in.
+   - Command runs UI mode: API on `${CIPHER_API_PORT:-3011}`, Web UI on `${CIPHER_UI_PORT:-3010}`
+   - Config mounted from `features/cipher/pmoves_cipher/memAgent/`
+   - Persistent storage via Docker volume `cipher_data`
 
 ## Setup Instructions
 
@@ -52,14 +53,14 @@ PMOVES-BoTZ now includes robust integration with Pmoves-cipher, providing advanc
 
 #### Linux/macOS
 ```bash
-cd pmoves_multi_agent_pro_pack/memory_shim
+cd features/cipher
 chmod +x setup_cipher.sh
 ./setup_cipher.sh
 ```
 
 #### Windows
 ```powershell
-cd pmoves_multi_agent_pro_pack\memory_shim
+cd features\cipher
 .\setup_cipher.ps1
 ```
 
@@ -67,7 +68,7 @@ cd pmoves_multi_agent_pro_pack\memory_shim
 
 1. **Build Cipher**
    ```bash
-   cd pmoves_multi_agent_pro_pack/memory_shim/pmoves_cipher
+   cd features/cipher/pmoves_cipher
    pnpm install --frozen-lockfile
    pnpm run build:no-ui
    ```
@@ -78,8 +79,10 @@ cd pmoves_multi_agent_pro_pack\memory_shim
    export VENICE_API_KEY=your-venice-key
    
    # Optional
-   export CIPHER_CONFIG_PATH=memory_shim/pmoves_cipher/memAgent/cipher_pmoves.yml
+   export CIPHER_CONFIG_PATH=features/cipher/pmoves_cipher/memAgent/cipher_pmoves.yml
    export PMOVES_ROOT=/path/to/pmoves
+   export CIPHER_API_PORT=3011
+   export CIPHER_UI_PORT=3010
    ```
 
 ## Usage
@@ -185,7 +188,7 @@ systemPrompt:
 ```
 
 ### MCP Catalog Integration
-Updated in: `pmoves_multi_agent_pro_pack/mcp_catalog_multi.yaml`
+Updated in: `core/mcp/catalog.yml`
 
 ```yaml
 servers:
@@ -252,7 +255,7 @@ python scripts/smoke_tests.py
 1. **Memory Storage Test**
    ```bash
    # Start cipher memory server
-   python3 pmoves_multi_agent_pro_pack/memory_shim/app_cipher_memory.py
+   python3 features/cipher/app_cipher_memory.py
    
    # Test with MCP client
    ```
@@ -260,7 +263,7 @@ python scripts/smoke_tests.py
 2. **Integration Test**
    ```bash
    # Start full pro stack
-   docker-compose -f pmoves_multi_agent_pro_pack/docker-compose.mcp-pro.yml up -d
+   docker-compose -f core/docker-compose/base.yml up -d
    
    # Test memory operations through MCP gateway
    ```
@@ -284,7 +287,7 @@ Error: Cipher Build: Cipher not built - run setup script
 ```
 **Solution**: Run setup script or build manually
 ```bash
-cd pmoves_multi_agent_pro_pack/memory_shim
+cd features/cipher
 ./setup_cipher.sh  # Linux/macOS
 # or
 .\setup_cipher.ps1  # Windows

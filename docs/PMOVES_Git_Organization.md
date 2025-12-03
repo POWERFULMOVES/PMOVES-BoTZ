@@ -118,6 +118,10 @@ runs-on: self-hosted
 | [PMOVES-Remote-View](https://github.com/POWERFULMOVES/PMOVES-Remote-View.git) | Remote access and viewing capabilities |
 | [PMOVES-Tailscale](https://github.com/POWERFULMOVES/PMOVES-Tailscale.git) | VPN and network integration |
 
+### Submodules (BoTZ)
+- `features/cipher/pmoves_cipher` → https://github.com/POWERFULMOVES/Pmoves-cipher.git (live Cipher UI/API integration)
+- `features/cipher/pmoves_cipher_backup/` is a read-only snapshot; keep it untouched and prefer the submodule for changes.
+
 ---
 
 ## Infrastructure & Deployment

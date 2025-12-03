@@ -251,26 +251,46 @@ async def run_stdio_server(server: DoclingMCPServer):
         )
 
 async def run_http_server(server: DoclingMCPServer, host: str = "0.0.0.0", port: int = 3020):
-    """Run the server with HTTP transport using SSE."""
+    """Run the server with HTTP transport using SSE and Starlette."""
     server.setup_handlers()
     
     # Start the server
     logger.info(f"Starting Docling MCP Server with HTTP transport on {host}:{port}...")
     
     try:
-        # Create SSE transport with proper endpoint
-        transport = SseServerTransport('/mcp')
-        
-        # For SSE transport, we use the standard Server.run() method
-        # The transport provides the necessary streams for HTTP communication
-        logger.info(f"SSE transport created with endpoint: /mcp")
-        logger.info(f"HTTP server should be accessible at http://{host}:{port}/mcp")
-        
-        # Run the server with the SSE transport (correct parameter order)
-        await server.server.run(
-            transport,
-            server.server.create_initialization_options()
-        )
+        from starlette.applications import Starlette
+        from starlette.routing import Route
+        from mcp.server.sse import SseServerTransport
+        import uvicorn
+
+        transport = SseServerTransport("/messages")
+
+        async def handle_sse(request):
+            async with transport.connect_sse(request.scope, request.receive, request.send) as streams:
+                read_stream, write_stream = streams
+                await server.server.run(
+                    read_stream,
+                    write_stream,
+                    server.server.create_initialization_options()
+                )
+
+        async def handle_messages(request):
+            await transport.handle_post_message(request.scope, request.receive, request.send)
+
+        from starlette.responses import JSONResponse
+
+        async def handle_health(request):
+            return JSONResponse({"status": "healthy"})
+
+        app = Starlette(routes=[
+            Route("/sse", endpoint=handle_sse),
+            Route("/messages", endpoint=handle_messages, methods=["POST"]),
+            Route("/health", endpoint=handle_health)
+        ])
+
+        config = uvicorn.Config(app, host=host, port=port, log_level="info")
+        server_instance = uvicorn.Server(config)
+        await server_instance.serve()
         
     except Exception as e:
         logger.error(f"Error running HTTP server: {e}")

@@ -1,0 +1,3 @@
+typer
+google-api-python-client
+google-generativeai
