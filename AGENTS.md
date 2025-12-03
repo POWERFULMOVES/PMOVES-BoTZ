@@ -10,6 +10,11 @@ Refactor Context (PMOVES-BoTZ from PMOVES-Kilobots)
   - `core/` for shared infrastructure (compose, MCP, core configs).
   - `features/` for modular capabilities (cipher, e2b, metrics, slack, discord, vl_sentinel, n8n, etc.).
   - `scripts/`, `docs/`, and `tests/` for unified scripts, documentation, and testing.
+  - **Cipher Memory**: `features/cipher`
+  - **Docling**: `features/docling`
+  - **E2B**: `features/e2b`
+  - **VL Sentinel**: `features/vl_sentinel`
+  - **MCP Gateway**: `features/gateway`
 - Legacy pack directories (`pmoves_multi_agent_pack`, `pmoves_multi_agent_pro_pack`, `pmoves_multi_agent_pro_plus_pack`, `pmoves-mini-agent-box`) are legacy and should be treated as read-only reference. Do not add new code, configs, or docs to these packs.
 - All new work (compose, MCP catalogs/modes, features, scripts, docs) should land in `core/`, `features/`, `scripts/`, `docs/`, or `tests/`—never as new "pack" variants.
 
