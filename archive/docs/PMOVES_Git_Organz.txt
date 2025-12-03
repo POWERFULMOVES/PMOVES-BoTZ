@@ -115,6 +115,8 @@ https://tailscale.com/kb/1392/auto-exit-nodes
 
 Rustdesk server
 
+https://github.com/tensorzero/tensorzero.git
+
 https://github.com/POWERFULMOVES/PMOVES-Remote-View.git
 https://rustdesk.com/docs/en/self-host/rustdesk-server-oss/install/
 https://rustdesk.com/docs/en/self-host/rustdesk-server-oss/docker/

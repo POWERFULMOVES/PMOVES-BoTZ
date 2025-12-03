@@ -41,18 +41,6 @@ Fill in the required values based on your pack selection:
 
 #### Pro Plus Pack Only
 - `SLACK_WEBHOOK_URL`: Slack webhook for CI reporting
-
-## Smoke Tests
-
-Run comprehensive smoke tests to verify system readiness:
-
-```bash
-python scripts/smoke_tests.py
-```
-
-### What the Smoke Tests Check
-
-1. **Environment Configuration**
    - Validates `.env` file exists
    - Checks for required environment variables
    - Verifies variable formatting

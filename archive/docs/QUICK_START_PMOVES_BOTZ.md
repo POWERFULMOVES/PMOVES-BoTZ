@@ -2,13 +2,15 @@
 
 ## Option A: Self‑Hosted (with Ollama)
 
-1) Local‑first bootstrap (.env auto‑created at repo root)
+1) Local-first bootstrap (.env auto-created at repo root)
 
-- The bring‑up scripts read `.env` from the repo root.
-- If `.env` is missing, `scripts/bring_up_pmoves_botz.(ps1|sh)` will auto‑create it from `core/example.env` and feature examples, so you don’t have to cd into subfolders.
-- Self‑hosted defaults:
+- The bring-up scripts read `.env` from the repo root.
+- If `.env` is missing, `scripts/bring_up_pmoves_botz.(ps1|sh)` will auto-create it from `core/example.env` and feature examples, so you don't have to cd into subfolders.
+- Self-hosted defaults:
+  - Set `VENICE_API_KEY` (required for Cipher to stay healthy)
   - `VL_PROVIDER=ollama`
   - `OLLAMA_BASE_URL=http://host.docker.internal:11434`
+  - `CIPHER_UI_PORT=3010` and `CIPHER_API_PORT=3011` (Cipher is always on; set `VENICE_API_KEY` or Cipher will remain unhealthy)
 
 2) Namespace and ports (PowerShell example)
 
@@ -73,7 +75,7 @@ docker compose --env-file .env `
 - Gateway: `http://mcp-gateway:8000`
 - Docling: `http://docling-mcp:3020`
 - E2B: `http://e2b-runner:7071`  |  VL: `http://vl-sentinel:7072`
-- Cipher (optional): `http://cipher-memory:3011`
+- Cipher: `http://cipher-memory:3011`
 
 ## Optional: Tailscale (Linux)
 - The `tailscale` service (linux profile) can proxy the MCP gateway over your tailnet.
