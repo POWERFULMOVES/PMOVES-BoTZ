@@ -99,6 +99,8 @@ services:
     build:
       context: ../../features/cipher
       dockerfile: Dockerfile.cipher
+    stdin_open: true
+    tty: true
     environment:
       - VENICE_API_KEY=${VENICE_API_KEY}
       - CIPHER_CONFIG_PATH=/app/features/cipher/pmoves_cipher/memAgent/cipher_pmoves.yml
