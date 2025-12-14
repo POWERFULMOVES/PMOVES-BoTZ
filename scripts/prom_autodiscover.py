@@ -8,15 +8,15 @@ LOCAL_MCP_JSON = os.path.join(CODEX_DIR, 'local_mcp.json')
 PROM_YML = os.path.join(BASE_DIR, 'features', 'metrics', 'prometheus.yml')
 
 def sh(cmd):
-    # Capture stderr so failing docker inspect calls don't spam the console.
-    p = subprocess.run(cmd, shell=True, text=True, capture_output=True)
+    """Run a command safely (no shell) and return stdout."""
+    p = subprocess.run(cmd, text=True, capture_output=True)
     if p.returncode != 0:
         raise subprocess.CalledProcessError(p.returncode, cmd, output=p.stdout, stderr=p.stderr)
     return p.stdout
 
 def container_exists(name_substr: str) -> bool:
     try:
-        out = sh("docker ps --format '{{.Names}}'")
+        out = sh(["docker", "ps", "--format", "{{.Names}}"])
         # Normalize CRLF if present on Windows
         lines = out.replace('\r','').splitlines()
         return any(name_substr in line for line in lines)
@@ -47,12 +47,12 @@ def build_targets():
     skip_urls = load_static_blackbox_targets()
     seen = set()  # (service, url)
     try:
-        raw = sh("docker ps --format '{{.Names}}'")
+        raw = sh(["docker", "ps", "--format", "{{.Names}}"])
         names = raw.replace('\r','').splitlines()
         for name in names:
             # Inspect labels and networks
             try:
-                insp = sh(f"docker inspect {name}")
+                insp = sh(["docker", "inspect", name])
                 info = json.loads(insp)[0]
                 labels = info.get('Config', {}).get('Labels', {}) or {}
                 networks = info.get('NetworkSettings', {}).get('Networks', {}) or {}
@@ -85,7 +85,12 @@ def main():
 
     prom_port = os.environ.get('PROMETHEUS_PORT', '9090')
     try:
-        sh(f"curl -fsS -X POST http://localhost:{prom_port}/-/reload >/dev/null")
+        subprocess.run(
+            ["curl", "-fsS", "-X", "POST", f"http://localhost:{prom_port}/-/reload"],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            check=True,
+        )
         print("Prometheus reloaded")
     except Exception:
         print("Warn: could not reload Prometheus; it will pick up on restart.")
@@ -97,7 +102,7 @@ def main():
         def host_port(svc, cport):
             name = f"{ns}-{svc}-1"
             try:
-                insp = json.loads(sh(f"docker inspect {name}"))[0]
+                insp = json.loads(sh(["docker", "inspect", name]))[0]
                 ports = insp.get('NetworkSettings', {}).get('Ports', {}) or {}
                 key = f"{cport}/tcp"
                 arr = ports.get(key)

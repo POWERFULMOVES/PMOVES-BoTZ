@@ -1,7 +1,7 @@
 services:
   mcp-gateway:
     ports: []
-    expose: ["8000"]
+    expose: ["2091"]
   docling-mcp:
     ports: []
     expose: ["3020"]
@@ -13,4 +13,4 @@ services:
     expose: ["7072"]
   cipher-memory:
     ports: []
-    expose: ["3010","3011"]
+    expose: []

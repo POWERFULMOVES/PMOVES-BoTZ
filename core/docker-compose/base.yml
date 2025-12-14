@@ -83,7 +83,8 @@ services:
       - ../../features/vl_sentinel:/app
     command: uvicorn app_vl:app --host 0.0.0.0 --port 7072
     environment:
-      OLLAMA_BASE_URL: ""
+      OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://host.docker.internal:11434}
+      VL_PROVIDER: ${VL_PROVIDER:-ollama}
       PORT: "7072"
     networks:
       - pmoves_ai

@@ -1,3 +1,17 @@
+services:
+  mcp-gateway:
+    ports:
+      - "${GATEWAY_PORT:-2091}:2091"
+  docling-mcp:
+    ports:
+      - "${DOCLING_PORT:-3020}:3020"
+  e2b-runner:
+    ports:
+      - "${E2B_PORT:-7071}:7071"
+  vl-sentinel:
+    ports:
+      - "${VL_PORT:-7072}:7072"
+
 networks:
   pmoves_ai:
     external: true
