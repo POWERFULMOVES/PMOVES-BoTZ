@@ -116,7 +116,28 @@ services:
         aliases: ["pmoves-botz_cipher", "cipher-memory"]
       pmoves_ai: {}
 
-  # 7. YT Mini Agent (YouTube/Media Layer)
+  # 7. n8n Agent (Workflow Automation Layer)
+  n8n-agent:
+    build:
+      context: ../../features/n8n
+      dockerfile: Dockerfile
+    stdin_open: true
+    tty: true
+    environment:
+      - N8N_API_URL=${N8N_API_URL:-http://n8n:5678/api/v1}
+      - N8N_API_KEY=${N8N_API_KEY}
+      - CIPHER_MEMORY_PATH=/app/features/cipher/pmoves_cipher
+    volumes:
+      - ../../features/cipher/pmoves_cipher:/app/features/cipher/pmoves_cipher:ro
+    depends_on:
+      - cipher-memory
+    labels:
+      pmoves.service: "n8n-agent"
+      pmoves.mcp: "true"
+    networks:
+      - pmoves_ai
+
+  # 8. YT Mini Agent (YouTube/Media Layer)
   yt-mini:
     build:
       context: ../../features/yt
