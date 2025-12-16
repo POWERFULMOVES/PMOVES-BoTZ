@@ -32,7 +32,15 @@ import mcp.server.stdio
 
 
 class TensorZeroClient:
-    """Client for TensorZero gateway LLM inference."""
+    """Client for TensorZero gateway LLM inference.
+
+    Provides OpenAI-compatible chat completions via TensorZero gateway
+    with unified observability and model routing.
+
+    Args:
+        base_url: Optional TensorZero gateway URL (defaults to env or http://tensorzero-gateway:3030)
+        model: Optional model name (defaults to env or qwen2_5_14b)
+    """
 
     def __init__(
         self,
@@ -53,7 +61,17 @@ class TensorZeroClient:
         temperature: float = 0.7,
         max_tokens: int = 1024,
     ) -> str:
-        """Send a chat completion request to TensorZero."""
+        """Send a chat completion request to TensorZero.
+
+        Args:
+            prompt: User message to send to the model
+            system_prompt: Optional system prompt to set context
+            temperature: Sampling temperature (0.0-1.0)
+            max_tokens: Maximum tokens to generate
+
+        Returns:
+            Model's response content or error message
+        """
         messages = []
         if system_prompt:
             messages.append({"role": "system", "content": system_prompt})
@@ -83,9 +101,21 @@ class TensorZeroClient:
 
 
 class N8nClient:
-    """HTTP client for n8n REST API."""
+    """HTTP client for n8n REST API.
+
+    Args:
+        base_url: n8n API base URL
+        api_key: n8n API key (required, must not be empty)
+
+    Raises:
+        ValueError: If api_key is None or empty
+    """
 
     def __init__(self, base_url: str, api_key: str) -> None:
+        if not api_key or not api_key.strip():
+            raise ValueError(
+                "N8N_API_KEY is required. Generate from n8n UI: Settings > API > Create API Key"
+            )
         self.base_url = base_url.rstrip("/")
         self.api_key = api_key
         self.headers = {
@@ -100,7 +130,20 @@ class N8nClient:
         data: Optional[Dict[str, Any]] = None,
         params: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
-        """Make HTTP request to n8n API."""
+        """Make HTTP request to n8n API.
+
+        Args:
+            method: HTTP method (GET, POST, PUT, DELETE)
+            endpoint: API endpoint path
+            data: Optional JSON request body
+            params: Optional query parameters
+
+        Returns:
+            JSON response from n8n API
+
+        Raises:
+            httpx.HTTPStatusError: If API returns error status
+        """
         url = f"{self.base_url}{endpoint}"
         async with httpx.AsyncClient(timeout=30.0) as client:
             response = await client.request(
@@ -114,41 +157,99 @@ class N8nClient:
             return response.json()
 
     async def list_workflows(self, active_only: bool = False) -> List[Dict[str, Any]]:
-        """List all workflows."""
+        """List all workflows.
+
+        Args:
+            active_only: If True, return only active workflows
+
+        Returns:
+            List of workflow objects
+        """
         params = {"active": "true"} if active_only else {}
         result = await self._request("GET", "/workflows", params=params)
         return result.get("data", [])
 
     async def get_workflow(self, workflow_id: str) -> Dict[str, Any]:
-        """Get workflow by ID."""
+        """Get workflow by ID.
+
+        Args:
+            workflow_id: Workflow identifier
+
+        Returns:
+            Workflow object with full configuration
+        """
         return await self._request("GET", f"/workflows/{workflow_id}")
 
     async def create_workflow(self, workflow_data: Dict[str, Any]) -> Dict[str, Any]:
-        """Create a new workflow."""
+        """Create a new workflow.
+
+        Args:
+            workflow_data: Workflow configuration object
+
+        Returns:
+            Created workflow object with ID
+        """
         return await self._request("POST", "/workflows", data=workflow_data)
 
     async def update_workflow(
         self, workflow_id: str, workflow_data: Dict[str, Any]
     ) -> Dict[str, Any]:
-        """Update an existing workflow."""
+        """Update an existing workflow.
+
+        Args:
+            workflow_id: Workflow identifier
+            workflow_data: Updated workflow configuration
+
+        Returns:
+            Updated workflow object
+        """
         return await self._request("PUT", f"/workflows/{workflow_id}", data=workflow_data)
 
     async def delete_workflow(self, workflow_id: str) -> Dict[str, Any]:
-        """Delete a workflow."""
+        """Delete a workflow.
+
+        Args:
+            workflow_id: Workflow identifier
+
+        Returns:
+            Deletion confirmation
+        """
         return await self._request("DELETE", f"/workflows/{workflow_id}")
 
     async def activate_workflow(self, workflow_id: str) -> Dict[str, Any]:
-        """Activate a workflow."""
+        """Activate a workflow.
+
+        Args:
+            workflow_id: Workflow identifier
+
+        Returns:
+            Updated workflow object with active=true
+        """
         return await self._request("POST", f"/workflows/{workflow_id}/activate")
 
     async def deactivate_workflow(self, workflow_id: str) -> Dict[str, Any]:
-        """Deactivate a workflow."""
+        """Deactivate a workflow.
+
+        Args:
+            workflow_id: Workflow identifier
+
+        Returns:
+            Updated workflow object with active=false
+        """
         return await self._request("POST", f"/workflows/{workflow_id}/deactivate")
 
     async def execute_workflow(
         self, workflow_id: str, data: Optional[Dict[str, Any]] = None
     ) -> Dict[str, Any]:
-        """Execute a workflow with optional input data."""
+        """Execute a workflow with optional input data.
+
+        Args:
+            workflow_id: Workflow identifier
+            data: Optional input data for workflow execution
+
+        Returns:
+            Execution result object
+        """
         return await self._request(
             "POST", f"/workflows/{workflow_id}/run", data=data or {}
         )
@@ -159,7 +260,16 @@ class N8nClient:
         limit: int = 10,
         status: Optional[str] = None,
     ) -> List[Dict[str, Any]]:
-        """Get execution history."""
+        """Get execution history.
+
+        Args:
+            workflow_id: Optional filter by workflow ID
+            limit: Maximum number of executions to return
+            status: Optional filter by execution status
+
+        Returns:
+            List of execution objects
+        """
         params: Dict[str, Any] = {"limit": limit}
         if workflow_id:
             params["workflowId"] = workflow_id
@@ -169,12 +279,27 @@ class N8nClient:
         return result.get("data", [])
 
     async def get_execution(self, execution_id: str) -> Dict[str, Any]:
-        """Get execution details."""
+        """Get execution details.
+
+        Args:
+            execution_id: Execution identifier
+
+        Returns:
+            Detailed execution object with step results
+        """
         return await self._request("GET", f"/executions/{execution_id}")
 
 
 class CipherMemoryClient:
-    """Client for cipher-memory MCP server integration with TensorZero LLM backend."""
+    """Client for cipher-memory MCP server integration with TensorZero LLM backend.
+
+    Provides memory storage and retrieval with LLM-powered suggestions
+    for workflow automation patterns.
+
+    Args:
+        cipher_path: Optional path to cipher installation
+        tensorzero_client: Optional TensorZero client for LLM operations
+    """
 
     def __init__(
         self,

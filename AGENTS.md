@@ -70,9 +70,21 @@ PMoves‑Cipher (UI/API)
 VL‑Sentinel (Vision‑Language)
 - Defaults to host Ollama: `OLLAMA_BASE_URL=http://host.docker.internal:11434`.
 - For healthy status, run Ollama and pull a model, e.g. `qwen2.5-vl:14b`.
+- **Linux note**: `host.docker.internal` works out-of-the-box on Docker Desktop (macOS/Windows) but requires `--add-host=host.docker.internal:host-gateway` on Linux. Either:
+  - Add to your `docker compose` command: `docker compose --add-host=host.docker.internal:host-gateway up -d`
+  - Or set `OLLAMA_BASE_URL` to your Linux host IP (e.g., `OLLAMA_BASE_URL=http://192.168.1.100:11434`)
+  - Or add `extra_hosts: ["host.docker.internal:host-gateway"]` to the vl-sentinel service in your compose file
 
 E2B Runner
 - Uses `E2B_API_KEY` from root `.env` to report healthy.
+
+n8n Agent (Workflow Automation)
+- Requires external n8n instance (not included in this stack)
+- Set `N8N_API_KEY` and `N8N_API_URL` in root `.env`
+- Generate API key from n8n UI: Settings > API > Create API Key
+- Default URL: `http://n8n:5678/api/v1` (assumes n8n on same network)
+- Optional: Deploy n8n separately or use cloud instance
+- See `features/n8n/` for agent implementation details
 
 Metrics & Blackbox
 - Prometheus/Alertmanager/Grafana compose overlay is under `features/metrics/`.

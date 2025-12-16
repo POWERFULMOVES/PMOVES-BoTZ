@@ -114,7 +114,7 @@ def main():
 
         cfg = { 'mcpServers': {} }
         # Gateway local
-        gw_port = os.environ.get('GATEWAY_PORT') or host_port('mcp-gateway', '8000') or '2091'
+        gw_port = os.environ.get('GATEWAY_PORT') or host_port('mcp-gateway', '2091') or '2091'
         cfg['mcpServers']['pmoves-gateway-local'] = { 'transport':'http', 'url': f"http://localhost:{gw_port}" }
         # Cipher direct (if mapped)
         cipher_api = os.environ.get('CIPHER_API_PORT') or host_port('cipher-memory','3011')

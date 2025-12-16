@@ -37,6 +37,8 @@ PMOVES-BoTZ is a unified multi-agent platform for document processing, memory ma
     .\scripts\stop.ps1
     ```
 
+**Linux Users**: Services using `host.docker.internal` (like VL Sentinel for Ollama access) require `--add-host=host.docker.internal:host-gateway` on Linux. See AGENTS.md for details.
+
 ## Services
 
 - **MCP Gateway**: http://localhost:2091

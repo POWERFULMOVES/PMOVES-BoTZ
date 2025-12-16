@@ -13,7 +13,7 @@ scrape_configs:
   - job_name: "mcp_gateway"
     metrics_path: "/metrics"
     static_configs:
-      - targets: ["mcp-gateway:8000"]
+      - targets: ["mcp-gateway:2091"]
 
   - job_name: "docling_mcp"
     metrics_path: "/metrics"
@@ -25,7 +25,7 @@ scrape_configs:
     params:
       module: [http_2xx]
     static_configs:
-      - targets: ['http://mcp-gateway:8000/ready']
+      - targets: ['http://mcp-gateway:2091/ready']
         labels:
           service: 'gateway'
       - targets: ['http://docling-mcp:3020/health']

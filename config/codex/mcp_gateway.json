@@ -6,7 +6,7 @@
     },
     "pmoves-gateway-net": {
       "transport": "http",
-      "url": "http://mcp-gateway:8000"
+      "url": "http://mcp-gateway:2091"
     },
     "cipher-direct": {
       "transport": "http",
