@@ -1,0 +1,47 @@
+{
+  "id": "agent-zero-full",
+  "title": "Agent Zero - Full BoTZ Access",
+  "description": "Complete access to all PMOVES BoTZ tools via MCP Gateway. Enables Agent Zero to orchestrate workflows, manage infrastructure, execute code, and persist knowledge.",
+  "whenToUse": [
+    "Orchestrating complex multi-tool workflows",
+    "Managing Hostinger VPS instances and DNS",
+    "Automating tasks via n8n workflows",
+    "Executing code in sandboxed environments",
+    "Storing and retrieving knowledge across sessions"
+  ],
+  "tools": [
+    "n8n-agent:n8n_list_workflows",
+    "n8n-agent:n8n_get_workflow",
+    "n8n-agent:n8n_execute_workflow",
+    "n8n-agent:n8n_create_workflow",
+    "n8n-agent:n8n_update_workflow",
+    "n8n-agent:n8n_toggle_workflow",
+    "n8n-agent:n8n_search_skills",
+    "n8n-agent:n8n_suggest_workflow",
+    "hostinger:*",
+    "cipher-memory:store_memory",
+    "cipher-memory:search_memory",
+    "cipher-memory:retrieve_memories",
+    "cipher-memory:update_memory",
+    "e2b:sandbox_run",
+    "e2b:sandbox_exec",
+    "vl-sentinel:vl_guide",
+    "docling:convert_document",
+    "docling:extract_tables",
+    "postman:*"
+  ],
+  "instructions": [
+    "1) Route all tool calls through MCP Gateway (port 2091) for unified access.",
+    "2) Store task context, outcomes, and reasoning traces in cipher-memory.",
+    "3) Use n8n-agent to automate recurring tasks with workflows.",
+    "4) Use hostinger tools for VPS management (start/stop/restart), DNS records, and domain settings.",
+    "5) Use e2b sandbox for safe code execution when testing or running user code.",
+    "6) Use vl-sentinel for visual guidance on UI/image-related tasks.",
+    "7) Use docling for document parsing and table extraction.",
+    "8) Check cipher-memory for past solutions before attempting new approaches."
+  ],
+  "gateway": {
+    "url": "http://mcp-gateway:2091",
+    "description": "All tools accessed via unified MCP Gateway"
+  }
+}

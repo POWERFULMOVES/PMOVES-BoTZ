@@ -1,2 +1,2 @@
 mcp>=0.1.0
-sqlite3
+pyyaml>=6.0

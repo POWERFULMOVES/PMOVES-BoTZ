@@ -20,12 +20,12 @@ host_port(){
 print_row(){ printf "%-16s %-36s\n" "$1" "$2"; }
 
 echo "\nEndpoints (host):"
-print_row Gateway "http://localhost:${GATEWAY_PORT:-$(host_port mcp-gateway 8000)}/ready"
+print_row Gateway "http://localhost:${GATEWAY_PORT:-$(host_port mcp-gateway 2091)}/ready"
 print_row Docling "http://localhost:${DOCLING_PORT:-$(host_port docling-mcp 3020)}/health"
 print_row Cipher  "http://localhost:${CIPHER_API_PORT:-$(host_port cipher-memory 3011)}/health"
 
 echo "\nEndpoints (pmoves-net DNS):"
-print_row Gateway "http://mcp-gateway:8000"
+print_row Gateway "http://mcp-gateway:2091"
 print_row Docling "http://docling-mcp:3020"
 print_row Cipher  "http://cipher-memory:3011"
 print_row E2B     "http://e2b-runner:7071"

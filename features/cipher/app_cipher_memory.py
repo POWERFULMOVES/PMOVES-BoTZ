@@ -1,621 +1,328 @@
 #!/usr/bin/env python3
 """
 PMOVES Cipher Memory Integration Layer
-Integrates Pmoves-cipher memory system with PMOVES MCP architecture.
+
+Runs an MCP server that proxies “memory” operations into the bundled
+Pmoves-cipher Node.js CLI (built into the image).
+
+Default transport is stdio (MCP SDK), which is appropriate for MCP clients.
 """
 
-import asyncio
-import json
-import os
-import subprocess
-import sys
-import time
-from pathlib import Path
-from typing import Dict, List, Optional, Any
-import tempfile
-import shutil
+from __future__ import annotations
 
+import argparse
+import asyncio
+import os
+import shutil
+import subprocess
+import tempfile
+from pathlib import Path
+from typing import Any, Dict, List, Optional
+
+import yaml
 from mcp import Tool
 from mcp.server import Server
-from mcp.types import TextContent
+from mcp.types import CallToolResult, TextContent
 import mcp.server.stdio
 
-class CipherMemoryManager:
-    """Interface to Pmoves-cipher memory system"""
 
-    def __init__(self, cipher_path: str = None):
+class CipherMemoryManager:
+    """Thin wrapper around the Pmoves-cipher CLI.
+
+    Provides Python interface to the Node.js Pmoves-cipher memory system,
+    enabling storage, retrieval, and reasoning pattern operations.
+
+    Args:
+        cipher_path: Optional path to cipher installation. Defaults to ./pmoves_cipher
+    """
+
+    def __init__(self, cipher_path: Optional[str] = None) -> None:
         self.cipher_path = Path(cipher_path) if cipher_path else Path(__file__).parent / "pmoves_cipher"
         self.cipher_binary = self.cipher_path / "dist" / "src" / "app" / "index.cjs"
-        self.config_path = self.cipher_path / "memAgent" / "cipher.yml"
-        self.temp_dir = None
+        self.config_path = self.cipher_path / "memAgent" / "cipher_pmoves.yml"
+        self._temp_dir: Optional[str] = None
 
-    def _ensure_cipher_built(self):
-        """Ensure cipher is built and available"""
-        if not self.cipher_binary.exists():
-            print(f"Building cipher at {self.cipher_path}...")
+    def _ensure_cipher_built(self) -> None:
+        """Verify cipher binary exists.
+
+        Raises:
+            RuntimeError: If cipher binary is not found
+        """
+        if self.cipher_binary.exists():
+            return
+        raise RuntimeError(f"Cipher binary not found at {self.cipher_binary}. Image build likely failed.")
+
+    def _create_temp_config(self, config_overrides: Optional[Dict[str, Any]] = None) -> Optional[str]:
+        """Create temporary config with YAML-based merging for reliability.
+
+        Args:
+            config_overrides: Optional dict with keys: llm_provider, llm_model, api_key
+
+        Returns:
+            Path to temp config file, or None if no overrides
+        """
+        if not config_overrides:
+            return None
+
+        base_path = Path(os.environ.get("CIPHER_CONFIG_PATH", str(self.config_path)))
+        if not base_path.exists():
+            raise RuntimeError(f"Cipher config not found at {base_path}")
+
+        self._temp_dir = tempfile.mkdtemp(prefix="pmoves_cipher_")
+
+        # Load and parse YAML config
+        with open(base_path) as f:
+            config = yaml.safe_load(f)
+
+        # Apply overrides with proper path navigation
+        if "llm_provider" in config_overrides:
+            if "llm" not in config:
+                config["llm"] = {}
+            config["llm"]["provider"] = config_overrides["llm_provider"]
+        if "llm_model" in config_overrides:
+            if "llm" not in config:
+                config["llm"] = {}
+            config["llm"]["model"] = config_overrides["llm_model"]
+        if "api_key" in config_overrides:
+            if "llm" not in config:
+                config["llm"] = {}
+            config["llm"]["apiKey"] = config_overrides["api_key"]
+
+        temp_config_path = Path(self._temp_dir) / "cipher.yml"
+        with open(temp_config_path, 'w') as f:
+            yaml.safe_dump(config, f)
+        return str(temp_config_path)
+
+    def _run_cipher_command(self, args: List[str], input_data: Optional[str] = None) -> str:
+        """Execute cipher CLI command with proper error handling.
+
+        Args:
+            args: Command arguments to pass to cipher CLI
+            input_data: Optional stdin input for the command
+
+        Returns:
+            Command stdout output
+
+        Raises:
+            RuntimeError: If cipher binary not found or command fails
+        """
+        self._ensure_cipher_built()
+
+        env = os.environ.copy()
+        try:
+            cmd = ["node", str(self.cipher_binary)] + args
+            result = subprocess.run(
+                cmd,
+                input=input_data,
+                text=True,
+                capture_output=True,
+                env=env,
+                timeout=60,
+            )
+            if result.returncode != 0:
+                raise RuntimeError(result.stderr.strip() or f"Cipher exited {result.returncode}")
+            return result.stdout
+        finally:
+            if self._temp_dir and os.path.exists(self._temp_dir):
+                shutil.rmtree(self._temp_dir, ignore_errors=True)
+            self._temp_dir = None
+
+    def store_memory(self, content: str, memory_type: str = "knowledge", session_id: str = "pmoves_default") -> str:
+        """Store content in cipher memory system.
+
+        Args:
+            content: Text content to store
+            memory_type: Type of memory (reserved for future use)
+            session_id: Session identifier (reserved for future use)
+
+        Returns:
+            Confirmation message from cipher
+        """
+        _ = (memory_type, session_id)  # reserved for future cipher schema routing
+        return self._run_cipher_command(["--mode", "cli", content]).strip()
+
+    def search_memory(self, query: str, limit: int = 10) -> List[Dict[str, Any]]:
+        """Search stored memories for matching content.
+
+        Args:
+            query: Search query string
+            limit: Maximum number of results to return
+
+        Returns:
+            List of matching memory entries with content, type, and relevance
+        """
+        output = self._run_cipher_command(["--mode", "cli", f"Search memory for: {query}"]).strip()
+        results: List[Dict[str, Any]] = []
+        for line in output.splitlines():
+            if not line.strip():
+                continue
+            results.append({"content": line.strip(), "type": "knowledge", "relevance": 1.0})
+            if len(results) >= limit:
+                break
+        return results
+
+    def extract_and_operate_memory(self, content: str, operation: str = "add") -> str:
+        """Extract knowledge from content and apply operation.
+
+        Args:
+            content: Source content to extract knowledge from
+            operation: Operation to perform (default: "add")
+
+        Returns:
+            Operation result message
+        """
+        return self._run_cipher_command(["--mode", "cli", f"Extract and {operation} this knowledge: {content}"]).strip()
+
+    def store_reasoning_memory(self, reasoning: str, context: str = "") -> str:
+        """Store reasoning steps with optional context.
+
+        Args:
+            reasoning: Reasoning text to store
+            context: Additional context information
+
+        Returns:
+            Confirmation message from cipher
+        """
+        return self._run_cipher_command(["--mode", "cli", f"Store reasoning: {reasoning}\nContext: {context}"]).strip()
+
+    def search_reasoning_patterns(self, query: str) -> List[Dict[str, Any]]:
+        """Search stored reasoning patterns.
+
+        Args:
+            query: Search query for reasoning patterns
+
+        Returns:
+            List of matching reasoning patterns
+        """
+        output = self._run_cipher_command(["--mode", "cli", f"Search reasoning patterns for: {query}"]).strip()
+        patterns: List[Dict[str, Any]] = []
+        for line in output.splitlines():
+            if not line.strip():
+                continue
+            patterns.append({"pattern": line.strip(), "type": "reasoning"})
+        return patterns
+
+
+class CipherMemoryServer:
+    """MCP server wrapper for CipherMemoryManager.
+
+    Exposes cipher memory operations as MCP tools for integration
+    with Model Context Protocol clients.
+    """
+
+    def __init__(self) -> None:
+        """Initialize MCP server with cipher memory backend."""
+        self.server = Server("pmoves-cipher-memory")
+        self.memory = CipherMemoryManager()
+
+    def setup_handlers(self) -> None:
+        """Register MCP tool handlers for cipher memory operations."""
+        @self.server.list_tools()
+        async def list_tools():
+            return [
+                Tool(
+                    name="cipher_store_memory",
+                    description="Store memory using Pmoves-cipher",
+                    inputSchema={
+                        "type": "object",
+                        "properties": {
+                            "content": {"type": "string"},
+                            "memory_type": {"type": "string", "default": "knowledge"},
+                            "session_id": {"type": "string", "default": "pmoves_default"},
+                        },
+                        "required": ["content"],
+                    },
+                ),
+                Tool(
+                    name="cipher_search_memory",
+                    description="Search memory using Pmoves-cipher",
+                    inputSchema={
+                        "type": "object",
+                        "properties": {"query": {"type": "string"}, "limit": {"type": "integer", "default": 10}},
+                        "required": ["query"],
+                    },
+                ),
+                Tool(
+                    name="cipher_extract_and_operate_memory",
+                    description="Extract knowledge and apply an operation using Pmoves-cipher",
+                    inputSchema={
+                        "type": "object",
+                        "properties": {
+                            "content": {"type": "string"},
+                            "operation": {"type": "string", "default": "add"},
+                        },
+                        "required": ["content"],
+                    },
+                ),
+                Tool(
+                    name="cipher_store_reasoning_memory",
+                    description="Store reasoning steps using Pmoves-cipher",
+                    inputSchema={
+                        "type": "object",
+                        "properties": {
+                            "reasoning": {"type": "string"},
+                            "context": {"type": "string", "default": ""},
+                        },
+                        "required": ["reasoning"],
+                    },
+                ),
+                Tool(
+                    name="cipher_search_reasoning_patterns",
+                    description="Search reasoning patterns using Pmoves-cipher",
+                    inputSchema={
+                        "type": "object",
+                        "properties": {"query": {"type": "string"}},
+                        "required": ["query"],
+                    },
+                ),
+            ]
+
+        @self.server.call_tool()
+        async def call_tool(name: str, arguments: Dict[str, Any]) -> CallToolResult:
             try:
-                # Install dependencies and build
-                subprocess.run(
-                    ["pnpm", "install"],
-                    cwd=self.cipher_path,
-                    check=True,
-                    capture_output=True
-                )
-                subprocess.run(
-                    ["pnpm", "run", "build:no-ui"],
-                    cwd=self.cipher_path,
-                    check=True,
-                    capture_output=True
-                )
-            except subprocess.CalledProcessError as e:
-                raise RuntimeError(f"Failed to build cipher: {e}")
-            except FileNotFoundError:
-                raise RuntimeError("pnpm not found. Please install Node.js and pnpm")
+                if name == "cipher_store_memory":
+                    out = self.memory.store_memory(
+                        arguments["content"],
+                        arguments.get("memory_type", "knowledge"),
+                        arguments.get("session_id", "pmoves_default"),
+                    )
+                    return CallToolResult(content=[TextContent(type="text", text=out)], isError=False)
+                if name == "cipher_search_memory":
+                    res = self.memory.search_memory(arguments["query"], int(arguments.get("limit", 10)))
+                    return CallToolResult(content=[TextContent(type="text", text=str(res))], isError=False)
+                if name == "cipher_extract_and_operate_memory":
+                    out = self.memory.extract_and_operate_memory(arguments["content"], arguments.get("operation", "add"))
+                    return CallToolResult(content=[TextContent(type="text", text=out)], isError=False)
+                if name == "cipher_store_reasoning_memory":
+                    out = self.memory.store_reasoning_memory(arguments["reasoning"], arguments.get("context", ""))
+                    return CallToolResult(content=[TextContent(type="text", text=out)], isError=False)
+                if name == "cipher_search_reasoning_patterns":
+                    res = self.memory.search_reasoning_patterns(arguments["query"])
+                    return CallToolResult(content=[TextContent(type="text", text=str(res))], isError=False)
+                return CallToolResult(content=[TextContent(type="text", text=f"Unknown tool: {name}")], isError=True)
+            except Exception as e:
+                return CallToolResult(content=[TextContent(type="text", text=f"Error: {e}")], isError=True)
 
-    def _create_temp_config(self, config_overrides: Dict[str, Any] = None) -> str:
-        """Create temporary cipher configuration"""
-        self.temp_dir = tempfile.mkdtemp(prefix="pmoves_cipher_")
-        
-        # Load base config
-        with open(self.config_path, 'r') as f:
-            config = f.read()
-        
-        # Apply overrides
-        if config_overrides:
-            # Simple string replacement for basic overrides
-            for key, value in config_overrides.items():
-                if key == "llm_provider":
-                    config = config.replace("provider: openai", f"provider: {value}")
-                elif key == "llm_model":
-                    config = config.replace("model: gpt-4.1-mini", f"model: {value}")
-                elif key == "api_key":
-                    config = config.replace("apiKey: $OPENAI_API_KEY", f"apiKey: {value}")
-        
-        temp_config_path = os.path.join(self.temp_dir, "cipher.yml")
-        with open(temp_config_path, 'w') as f:
-            f.write(config)
-        
-        return temp_config_path
 
-    def _run_cipher_command(self, args: List[str], input_data: str = None) -> str:
-        """Run cipher command and return output"""
-        self._ensure_cipher_built()
-        
-        env = os.environ.copy()
-        if self.temp_dir:
-            env["CIPHER_CONFIG_PATH"] = os.path.join(self.temp_dir, "cipher.yml")
-        
-        try:
-            cmd = ["node", str(self.cipher_binary)] + args
-            result = subprocess.run(
-                cmd,
-                input=input_data,
-                text=True,
-                capture_output=True,
-                env=env,
-                timeout=30
-            )
-            
-            if result.returncode != 0:
-                raise RuntimeError(f"Cipher command failed: {result.stderr}")
-            
-            return result.stdout
-        except subprocess.TimeoutExpired:
-            raise RuntimeError("Cipher command timed out")
-        finally:
-            if self.temp_dir and os.path.exists(self.temp_dir):
-                shutil.rmtree(self.temp_dir, ignore_errors=True)
-                self.temp_dir = None
-
-    def store_memory(self, content: str, memory_type: str = "knowledge", 
-                    session_id: str = "pmoves_default") -> str:
-        """Store memory using cipher"""
-        args = ["--mode", "cli", content]
-        output = self._run_cipher_command(args)
-        return output.strip()
-
-    def search_memory(self, query: str, limit: int = 10) -> List[Dict[str, Any]]:
-        """Search memory using cipher"""
-        # Use cipher's memory search capabilities
-        args = ["--mode", "cli", f"Search memory for: {query}"]
-        output = self._run_cipher_command(args)
-        
-        # Parse output (simplified - in real implementation would parse structured output)
-        results = []
-        lines = output.strip().split('\n')
-        for line in lines:
-            if line.strip():
-                results.append({
-                    "content": line.strip(),
-                    "type": "knowledge",
-                    "relevance": 1.0  # Placeholder
-                })
-        
-        return results[:limit]
-
-    def extract_and_operate_memory(self, content: str, operation: str = "add") -> str:
-        """Extract knowledge and apply operation using cipher"""
-        args = ["--mode", "cli", f"Extract and {operation} this knowledge: {content}"]
-        output = self._run_cipher_command(args)
-        return output.strip()
-
-    def store_reasoning_memory(self, reasoning: str, context: str = "") -> str:
-        """Store reasoning steps using cipher"""
-        args = ["--mode", "cli", f"Store reasoning: {reasoning}\nContext: {context}"]
-        output = self._run_cipher_command(args)
-        return output.strip()
-
-    def search_reasoning_patterns(self, query: str) -> List[Dict[str, Any]]:
-        """Search reasoning patterns using cipher"""
-        args = ["--mode", "cli", f"Search reasoning patterns for: {query}"]
-        output = self._run_cipher_command(args)
-        
-        # Parse output
-        patterns = []
-        lines = output.strip().split('\n')
-        for line in lines:
-            if line.strip():
-                patterns.append({
-                    "pattern": line.strip(),
-                    "type": "reasoning"
-                })
-        
-        return patterns
-
-class CipherMemoryServer:
-    """MCP Server for Cipher Memory Integration"""
-
-    def __init__(self):
-        self.server = Server("pmoves-cipher-memory")
-        self.memory_manager = CipherMemoryManager()
-
-    async def handle_store_memory(self, arguments: Dict[str, Any]) -> List[TextContent]:
-        """Store memory using cipher"""
-        content = arguments["content"]
-        memory_type = arguments.get("memory_type", "knowledge")
-        session_id = arguments.get("session_id", "pmoves_default")
-
-        try:
-            result = self.memory_manager.store_memory(content, memory_type, session_id)
-            return [TextContent(
-                type="text",
-                text=f"Memory stored successfully: {result}"
-            )]
-        except Exception as e:
-            return [TextContent(
-                type="text",
-                text=f"Error storing memory: {str(e)}"
-            )]
-
-    async def handle_search_memory(self, arguments: Dict[str, Any]) -> List[TextContent]:
-        """Search memory using cipher"""
-        query = arguments["query"]
-        limit = arguments.get("limit", 10)
-
-        try:
-            results = self.memory_manager.search_memory(query, limit)
-            
-            if not results:
-                return [TextContent(type="text", text="No memories found")]
-            
-            result_text = f"Found {len(results)} memories:\n\n"
-            for i, memory in enumerate(results, 1):
-                result_text += f"{i}. {memory['content']}\n"
-                result_text += f"   Type: {memory['type']}\n"
-                result_text += f"   Relevance: {memory['relevance']}\n\n"
-            
-            return [TextContent(type="text", text=result_text)]
-        except Exception as e:
-            return [TextContent(
-                type="text",
-                text=f"Error searching memory: {str(e)}"
-            )]
-
-    async def handle_extract_and_operate_memory(self, arguments: Dict[str, Any]) -> List[TextContent]:
-        """Extract knowledge and apply operation using cipher"""
-        content = arguments["content"]
-        operation = arguments.get("operation", "add")
-
-        try:
-            result = self.memory_manager.extract_and_operate_memory(content, operation)
-            return [TextContent(
-                type="text",
-                text=f"Memory operation completed: {result}"
-            )]
-        except Exception as e:
-            return [TextContent(
-                type="text",
-                text=f"Error with memory operation: {str(e)}"
-            )]
-
-    async def handle_store_reasoning_memory(self, arguments: Dict[str, Any]) -> List[TextContent]:
-        """Store reasoning steps using cipher"""
-        reasoning = arguments["reasoning"]
-        context = arguments.get("context", "")
-
-        try:
-            result = self.memory_manager.store_reasoning_memory(reasoning, context)
-            return [TextContent(
-                type="text",
-                text=f"Reasoning stored successfully: {result}"
-            )]
-        except Exception as e:
-            return [TextContent(
-                type="text",
-                text=f"Error storing reasoning: {str(e)}"
-            )]
-
-    async def handle_search_reasoning_patterns(self, arguments: Dict[str, Any]) -> List[TextContent]:
-        """Search reasoning patterns using cipher"""
-        query = arguments["query"]
-
-        try:
-            patterns = self.memory_manager.search_reasoning_patterns(query)
-            
-            if not patterns:
-                return [TextContent(type="text", text="No reasoning patterns found")]
-            
-            result_text = f"Found {len(patterns)} reasoning patterns:\n\n"
-            for i, pattern in enumerate(patterns, 1):
-                result_text += f"{i}. {pattern['pattern']}\n"
-                result_text += f"   Type: {pattern['type']}\n\n"
-            
-            return [TextContent(type="text", text=result_text)]
-        except Exception as e:
-                    config = config.replace("model: gpt-4.1-mini", f"model: {value}")
-                elif key == "api_key":
-                    config = config.replace("apiKey: $OPENAI_API_KEY", f"apiKey: {value}")
-        
-        temp_config_path = os.path.join(self.temp_dir, "cipher.yml")
-        with open(temp_config_path, 'w') as f:
-            f.write(config)
-        
-        return temp_config_path
-
-    def _run_cipher_command(self, args: List[str], input_data: str = None) -> str:
-        """Run cipher command and return output"""
-        self._ensure_cipher_built()
-        
-        env = os.environ.copy()
-        if self.temp_dir:
-            env["CIPHER_CONFIG_PATH"] = os.path.join(self.temp_dir, "cipher.yml")
-        
-        try:
-            cmd = ["node", str(self.cipher_binary)] + args
-            result = subprocess.run(
-                cmd,
-                input=input_data,
-                text=True,
-                capture_output=True,
-                env=env,
-                timeout=30
-            )
-            
-            if result.returncode != 0:
-                raise RuntimeError(f"Cipher command failed: {result.stderr}")
-            
-            return result.stdout
-        except subprocess.TimeoutExpired:
-            raise RuntimeError("Cipher command timed out")
-        finally:
-            if self.temp_dir and os.path.exists(self.temp_dir):
-                shutil.rmtree(self.temp_dir, ignore_errors=True)
-                self.temp_dir = None
-
-    def store_memory(self, content: str, memory_type: str = "knowledge", 
-                    session_id: str = "pmoves_default") -> str:
-        """Store memory using cipher"""
-        args = ["--mode", "cli", content]
-        output = self._run_cipher_command(args)
-        return output.strip()
-
-    def search_memory(self, query: str, limit: int = 10) -> List[Dict[str, Any]]:
-        """Search memory using cipher"""
-        # Use cipher's memory search capabilities
-        args = ["--mode", "cli", f"Search memory for: {query}"]
-        output = self._run_cipher_command(args)
-        
-        # Parse output (simplified - in real implementation would parse structured output)
-        results = []
-        lines = output.strip().split('\n')
-        for line in lines:
-            if line.strip():
-                results.append({
-                    "content": line.strip(),
-                    "type": "knowledge",
-                    "relevance": 1.0  # Placeholder
-                })
-        
-        return results[:limit]
-
-    def extract_and_operate_memory(self, content: str, operation: str = "add") -> str:
-        """Extract knowledge and apply operation using cipher"""
-        args = ["--mode", "cli", f"Extract and {operation} this knowledge: {content}"]
-        output = self._run_cipher_command(args)
-        return output.strip()
-
-    def store_reasoning_memory(self, reasoning: str, context: str = "") -> str:
-        """Store reasoning steps using cipher"""
-        args = ["--mode", "cli", f"Store reasoning: {reasoning}\nContext: {context}"]
-        output = self._run_cipher_command(args)
-        return output.strip()
-
-    def search_reasoning_patterns(self, query: str) -> List[Dict[str, Any]]:
-        """Search reasoning patterns using cipher"""
-        args = ["--mode", "cli", f"Search reasoning patterns for: {query}"]
-        output = self._run_cipher_command(args)
-        
-        # Parse output
-        patterns = []
-        lines = output.strip().split('\n')
-        for line in lines:
-            if line.strip():
-                patterns.append({
-                    "pattern": line.strip(),
-                    "type": "reasoning"
-                })
-        
-        return patterns
-
-class CipherMemoryServer:
-    """MCP Server for Cipher Memory Integration"""
-
-    def __init__(self):
-        self.server = Server("pmoves-cipher-memory")
-        self.memory_manager = CipherMemoryManager()
-
-    async def handle_store_memory(self, arguments: Dict[str, Any]) -> List[TextContent]:
-        """Store memory using cipher"""
-        content = arguments["content"]
-        memory_type = arguments.get("memory_type", "knowledge")
-        session_id = arguments.get("session_id", "pmoves_default")
-
-        try:
-            result = self.memory_manager.store_memory(content, memory_type, session_id)
-            return [TextContent(
-                type="text",
-                text=f"Memory stored successfully: {result}"
-            )]
-        except Exception as e:
-            return [TextContent(
-                type="text",
-                text=f"Error storing memory: {str(e)}"
-            )]
-
-    async def handle_search_memory(self, arguments: Dict[str, Any]) -> List[TextContent]:
-        """Search memory using cipher"""
-        query = arguments["query"]
-        limit = arguments.get("limit", 10)
-
-        try:
-            results = self.memory_manager.search_memory(query, limit)
-            
-            if not results:
-                return [TextContent(type="text", text="No memories found")]
-            
-            result_text = f"Found {len(results)} memories:\n\n"
-            for i, memory in enumerate(results, 1):
-                result_text += f"{i}. {memory['content']}\n"
-                result_text += f"   Type: {memory['type']}\n"
-                result_text += f"   Relevance: {memory['relevance']}\n\n"
-            
-            return [TextContent(type="text", text=result_text)]
-        except Exception as e:
-            return [TextContent(
-                type="text",
-                text=f"Error searching memory: {str(e)}"
-            )]
-
-    async def handle_extract_and_operate_memory(self, arguments: Dict[str, Any]) -> List[TextContent]:
-        """Extract knowledge and apply operation using cipher"""
-        content = arguments["content"]
-        operation = arguments.get("operation", "add")
-
-        try:
-            result = self.memory_manager.extract_and_operate_memory(content, operation)
-            return [TextContent(
-                type="text",
-                text=f"Memory operation completed: {result}"
-            )]
-        except Exception as e:
-            return [TextContent(
-                type="text",
-                text=f"Error with memory operation: {str(e)}"
-            )]
-
-    async def handle_store_reasoning_memory(self, arguments: Dict[str, Any]) -> List[TextContent]:
-        """Store reasoning steps using cipher"""
-        reasoning = arguments["reasoning"]
-        context = arguments.get("context", "")
-
-        try:
-            result = self.memory_manager.store_reasoning_memory(reasoning, context)
-            return [TextContent(
-                type="text",
-                text=f"Reasoning stored successfully: {result}"
-            )]
-        except Exception as e:
-            return [TextContent(
-                type="text",
-                text=f"Error storing reasoning: {str(e)}"
-            )]
-
-    async def handle_search_reasoning_patterns(self, arguments: Dict[str, Any]) -> List[TextContent]:
-        """Search reasoning patterns using cipher"""
-        query = arguments["query"]
-
-        try:
-            patterns = self.memory_manager.search_reasoning_patterns(query)
-            
-            if not patterns:
-                return [TextContent(type="text", text="No reasoning patterns found")]
-            
-            result_text = f"Found {len(patterns)} reasoning patterns:\n\n"
-            for i, pattern in enumerate(patterns, 1):
-                result_text += f"{i}. {pattern['pattern']}\n"
-                result_text += f"   Type: {pattern['type']}\n\n"
-            
-            return [TextContent(type="text", text=result_text)]
-        except Exception as e:
-            return [TextContent(
-                type="text",
-                text=f"Error searching reasoning patterns: {str(e)}"
-            )]
-
-async def run_http_server(server: CipherMemoryServer, host: str = "0.0.0.0", port: int = 8081):
-    """Run the server with HTTP transport using SSE and Starlette."""
-    # Register tools (this is done in main usually, but we need to do it here or refactor)
-    # Refactoring main to be reusable or just registering here.
-    # Let's instantiate server and register tools inside run_http_server for simplicity or reuse logic.
-    
-    # Actually, main() does instantiation and registration.
-    # We should split registration into a method.
-    pass
-
-def register_tools(server: CipherMemoryServer):
-    @server.server.list_tools()
-    async def list_tools():
-        return [
-            Tool(
-                name="cipher_store_memory",
-                description="Store memory using Pmoves-cipher system",
-                inputSchema={
-                    "type": "object",
-                    "properties": {
-                        "content": {"type": "string", "description": "Content to store in memory"},
-                        "memory_type": {"type": "string", "description": "Type of memory (knowledge, reflection, etc.)", "default": "knowledge"},
-                        "session_id": {"type": "string", "description": "Session identifier", "default": "pmoves_default"}
-                    },
-                    "required": ["content"]
-                }
-            ),
-            Tool(
-                name="cipher_search_memory",
-                description="Search memory using Pmoves-cipher system",
-                inputSchema={
-                    "type": "object",
-                    "properties": {
-                        "query": {"type": "string", "description": "Search query"},
-                        "limit": {"type": "integer", "description": "Maximum number of results", "default": 10}
-                    },
-                    "required": ["query"]
-                }
-            ),
-            Tool(
-                name="cipher_extract_and_operate_memory",
-                description="Extract knowledge and apply operation using Pmoves-cipher",
-                inputSchema={
-                    "type": "object",
-                    "properties": {
-                        "content": {"type": "string", "description": "Content to extract knowledge from"},
-                        "operation": {"type": "string", "description": "Operation to apply (add, update, delete)", "default": "add"}
-                    },
-                    "required": ["content"]
-                }
-            ),
-            Tool(
-                name="cipher_store_reasoning_memory",
-                description="Store reasoning steps using Pmoves-cipher",
-                inputSchema={
-                    "type": "object",
-                    "properties": {
-                        "reasoning": {"type": "string", "description": "Reasoning steps to store"},
-                        "context": {"type": "string", "description": "Additional context for the reasoning"}
-                    },
-                    "required": ["reasoning"]
-                }
-            ),
-            Tool(
-                name="cipher_search_reasoning_patterns",
-                description="Search reasoning patterns using Pmoves-cipher",
-                inputSchema={
-                    "type": "object",
-                    "properties": {
-                        "query": {"type": "string", "description": "Search query for reasoning patterns"}
-                    },
-                    "required": ["query"]
-                }
-            )
-        ]
-
-    @server.server.call_tool()
-    async def call_tool(name: str, arguments: Dict[str, Any]) -> List[TextContent]:
-        if name == "cipher_store_memory":
-            return await server.handle_store_memory(arguments)
-        elif name == "cipher_search_memory":
-            return await server.handle_search_memory(arguments)
-        elif name == "cipher_extract_and_operate_memory":
-            return await server.handle_extract_and_operate_memory(arguments)
-        elif name == "cipher_store_reasoning_memory":
-            return await server.handle_store_reasoning_memory(arguments)
-        elif name == "cipher_search_reasoning_patterns":
-            return await server.handle_search_reasoning_patterns(arguments)
-        else:
-            return [TextContent(type="text", text=f"Unknown tool: {name}")]
-
-async def run_stdio_server(server: CipherMemoryServer):
-    register_tools(server)
+async def run_stdio_server(server: CipherMemoryServer) -> None:
+    server.setup_handlers()
     async with mcp.server.stdio.stdio_server() as (read_stream, write_stream):
         await server.server.run(
             read_stream,
             write_stream,
-            server.server.create_initialization_options()
+            server.server.create_initialization_options(),
         )
 
-async def run_http_server(server: CipherMemoryServer, host: str = "0.0.0.0", port: int = 8081):
-    register_tools(server)
-    
-    from starlette.applications import Starlette
-    from starlette.routing import Route
-    from starlette.responses import JSONResponse
-    from mcp.server.sse import SseServerTransport
-    import uvicorn
 
-    transport = SseServerTransport("/messages")
-
-    async def handle_sse(request):
-        async with transport.connect_sse(request.scope, request.receive, request.send) as streams:
-            read_stream, write_stream = streams
-            await server.server.run(
-                read_stream,
-                write_stream,
-                server.server.create_initialization_options()
-            )
-
-    async def handle_messages(request):
-        await transport.handle_post_message(request.scope, request.receive, request.send)
-
-    async def handle_health(request):
-        return JSONResponse({"status": "healthy"})
-
-    app = Starlette(routes=[
-        Route("/sse", endpoint=handle_sse),
-        Route("/messages", endpoint=handle_messages, methods=["POST"]),
-        Route("/health", endpoint=handle_health)
-    ])
-
-    config = uvicorn.Config(app, host=host, port=port, log_level="info")
-    server_instance = uvicorn.Server(config)
-    await server_instance.serve()
-
-def main():
-    import argparse
-    parser = argparse.ArgumentParser(description="Cipher Memory MCP Server")
-    parser.add_argument("--transport", choices=["stdio", "sse"], default="stdio", help="Transport type")
-    parser.add_argument("--host", default="0.0.0.0", help="Host for SSE")
-    parser.add_argument("--port", type=int, default=8081, help="Port for SSE")
-    args = parser.parse_args()
+def main() -> None:
+    parser = argparse.ArgumentParser(description="PMOVES Cipher Memory MCP Server")
+    parser.add_argument("--transport", choices=["stdio"], default="stdio")
+    _ = parser.parse_args()
 
     server = CipherMemoryServer()
+    asyncio.run(run_stdio_server(server))
 
-    if args.transport == "stdio":
-        asyncio.run(run_stdio_server(server))
-    elif args.transport == "sse":
-        asyncio.run(run_http_server(server, args.host, args.port))
 
 if __name__ == "__main__":
-    # Check if we should start in UI mode
-    if os.environ.get('CIPHER_UI_MODE', 'false').lower() == 'true':
-        start_cipher_ui_mode()
-    else:
-        main()
+    main()
+

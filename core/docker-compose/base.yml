@@ -26,7 +26,10 @@ services:
     working_dir: /app
     volumes:
       - ../../features/gateway/python-gateway:/app
-    command: sh -c "pip install fastmcp && python gateway.py"
+      - /var/run/docker.sock:/var/run/docker.sock
+    command: sh -c "apt-get update && apt-get install -y docker.io && pip install pyyaml && python gateway.py"
+    ports:
+      - "2091:2091"
     environment:
       - PORT=2091
     networks:
@@ -83,7 +86,8 @@ services:
       - ../../features/vl_sentinel:/app
     command: uvicorn app_vl:app --host 0.0.0.0 --port 7072
     environment:
-      OLLAMA_BASE_URL: ""
+      OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://host.docker.internal:11434}
+      VL_PROVIDER: ${VL_PROVIDER:-ollama}
       PORT: "7072"
     networks:
       - pmoves_ai
@@ -98,6 +102,8 @@ services:
     build:
       context: ../../features/cipher
       dockerfile: Dockerfile.cipher
+    stdin_open: true
+    tty: true
     environment:
       - VENICE_API_KEY=${VENICE_API_KEY}
       - CIPHER_CONFIG_PATH=/app/features/cipher/pmoves_cipher/memAgent/cipher_pmoves.yml
@@ -113,7 +119,32 @@ services:
         aliases: ["pmoves-botz_cipher", "cipher-memory"]
       pmoves_ai: {}
 
-  # 7. YT Mini Agent (YouTube/Media Layer)
+  # 7. n8n Agent (Workflow Automation Layer)
+  n8n-agent:
+    build:
+      context: ../../features/n8n
+      dockerfile: Dockerfile
+    stdin_open: true
+    tty: true
+    environment:
+      - N8N_API_URL=${N8N_API_URL:-http://n8n:5678/api/v1}
+      - N8N_API_KEY=${N8N_API_KEY}
+      - CIPHER_MEMORY_PATH=/app/features/cipher/pmoves_cipher
+      # TensorZero integration for local LLM inference
+      - TENSORZERO_BASE_URL=${TENSORZERO_BASE_URL:-http://tensorzero-gateway:3030}
+      - TENSORZERO_MODEL=${TENSORZERO_MODEL:-qwen2_5_14b}
+      - TENSORZERO_API_KEY=${TENSORZERO_API_KEY:-}
+    volumes:
+      - ../../features/cipher/pmoves_cipher:/app/features/cipher/pmoves_cipher:ro
+    depends_on:
+      - cipher-memory
+    labels:
+      pmoves.service: "n8n-agent"
+      pmoves.mcp: "true"
+    networks:
+      - pmoves_ai
+
+  # 8. YT Mini Agent (YouTube/Media Layer)
   yt-mini:
     build:
       context: ../../features/yt
@@ -124,6 +155,22 @@ services:
       PMOVES_MODE: yt-mini
     restart: unless-stopped
     command: tail -f /dev/null
+    networks:
+      - pmoves_ai
+
+  # 9. Hostinger Agent (VPS/DNS/Domain Management)
+  hostinger:
+    build:
+      context: ../../features/hostinger
+      dockerfile: Dockerfile
+    stdin_open: true
+    tty: true
+    environment:
+      - API_TOKEN=${HOSTINGER_API_KEY}
+      - HOSTINGER_API_KEY=${HOSTINGER_API_KEY}
+    labels:
+      pmoves.service: "hostinger"
+      pmoves.mcp: "true"
     networks:
       - pmoves_ai
 

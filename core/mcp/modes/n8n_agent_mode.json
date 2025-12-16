@@ -1,0 +1,34 @@
+{
+  "id": "pmoves-n8n-agent",
+  "title": "PMOVES • n8n Workflow Agent",
+  "description": "Full n8n workflow control with cipher-memory integration for skills storage, documentation, and intelligent workflow suggestions.",
+  "whenToUse": [
+    "Automating tasks that require n8n workflow execution",
+    "Creating, updating, or managing n8n workflows programmatically",
+    "Finding the best existing workflow for a new task based on past patterns",
+    "Building automation skills library with documented workflows"
+  ],
+  "tools": [
+    "n8n-agent:n8n_list_workflows",
+    "n8n-agent:n8n_get_workflow",
+    "n8n-agent:n8n_execute_workflow",
+    "n8n-agent:n8n_create_workflow",
+    "n8n-agent:n8n_update_workflow",
+    "n8n-agent:n8n_delete_workflow",
+    "n8n-agent:n8n_toggle_workflow",
+    "n8n-agent:n8n_get_executions",
+    "n8n-agent:n8n_store_workflow_doc",
+    "n8n-agent:n8n_search_skills",
+    "n8n-agent:n8n_suggest_workflow",
+    "n8n-agent:n8n_learn_from_execution",
+    "cipher-memory:*"
+  ],
+  "instructions": [
+    "1) When automating a task, first use n8n_search_skills or n8n_suggest_workflow to find existing patterns.",
+    "2) List workflows with n8n_list_workflows to see what's available.",
+    "3) Execute the best workflow with n8n_execute_workflow, passing any required input data.",
+    "4) After execution, use n8n_learn_from_execution to store the outcome and reasoning.",
+    "5) When creating new workflows, document them with n8n_store_workflow_doc for future discovery.",
+    "6) Use cipher-memory tools for additional skills storage and cross-workflow knowledge."
+  ]
+}

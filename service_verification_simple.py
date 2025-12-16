@@ -15,8 +15,10 @@ from datetime import datetime
 from typing import Dict, List, Optional, Tuple
 import urllib3
 
-# Disable SSL warnings for local testing
-urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+# Allow opt-in TLS skipping (default is secure verification)
+_SKIP_TLS_VERIFY = os.getenv("PMOVES_INSECURE_SKIP_TLS_VERIFY", "false").lower() in {"1", "true", "yes"}
+if _SKIP_TLS_VERIFY:
+    urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 class ServiceVerifier:
     """Comprehensive service verification for PMOVES-Kilobots"""
@@ -24,6 +26,7 @@ class ServiceVerifier:
     def __init__(self):
         self.results = {}
         self.start_time = datetime.now()
+        self.verify_tls = not _SKIP_TLS_VERIFY
         
         # Service configurations
         self.services = {
@@ -125,7 +128,7 @@ class ServiceVerifier:
             response = requests.get(
                 url,
                 timeout=10,
-                verify=False,
+                verify=self.verify_tls,
                 headers={"User-Agent": "PMOVES-Service-Verifier/1.0"}
             )
             
@@ -250,13 +253,13 @@ class ServiceVerifier:
             if service_name == "mcp-gateway":
                 # Test gateway tools endpoint
                 url = f"http://{config['host']}:{config['port']}/tools"
-                response = requests.get(url, timeout=5, verify=False)
+                response = requests.get(url, timeout=5, verify=self.verify_tls)
                 return response.status_code == 200, f"Tools endpoint: {response.status_code}"
                 
             elif service_name == "docling-mcp":
                 # Test docling health with more detail
                 url = f"http://{config['host']}:{config['port']}/health"
-                response = requests.get(url, timeout=5, verify=False)
+                response = requests.get(url, timeout=5, verify=self.verify_tls)
                 if response.status_code == 200:
                     data = response.json()
                     return True, f"Docling healthy: {data.get('status', 'unknown')}"
@@ -266,7 +269,7 @@ class ServiceVerifier:
             elif service_name == "e2b-runner":
                 # Test E2B with a simple sandbox request
                 url = f"http://{config['host']}:{config['port']}/health"
-                response = requests.get(url, timeout=5, verify=False)
+                response = requests.get(url, timeout=5, verify=self.verify_tls)
                 if response.status_code == 200:
                     return True, "E2B health endpoint responding"
                 else:
@@ -275,7 +278,7 @@ class ServiceVerifier:
             elif service_name == "vl-sentinel":
                 # Test VL sentinel health
                 url = f"http://{config['host']}:{config['port']}/health"
-                response = requests.get(url, timeout=5, verify=False)
+                response = requests.get(url, timeout=5, verify=self.verify_tls)
                 if response.status_code == 200:
                     data = response.json()
                     return True, f"VL Sentinel healthy: {data.get('status', 'unknown')}"

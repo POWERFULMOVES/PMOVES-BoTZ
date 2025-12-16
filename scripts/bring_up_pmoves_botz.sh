@@ -10,7 +10,7 @@ export PMOVES_AI_NETWORK=${PMOVES_AI_NETWORK:-pmoves-net}
 if [[ ! -f .env ]]; then
   echo "[0/4] No .env found — bootstrapping from examples (local-first, Ollama)…"
   if [[ -f ./scripts/setup_pmoves.sh ]]; then
-    ./scripts/setup_pmoves.sh -c pro || true
+    bash ./scripts/setup_pmoves.sh -c pro || true
   elif [[ -f ./core/example.env ]]; then
     cp ./core/example.env ./.env || true
   fi
@@ -66,7 +66,7 @@ python3 ./scripts/prom_autodiscover.py || true
 
 echo "Provision existing Grafana (3002) if reachable ..."
 if curl -fsS http://localhost:3002/login >/dev/null 2>&1; then
-  ./scripts/grafana_provision.sh
+  bash ./scripts/grafana_provision.sh
 else
   echo "grafana-1 (3002) not reachable; skipping external provisioning"
 fi

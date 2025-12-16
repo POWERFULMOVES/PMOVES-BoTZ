@@ -33,15 +33,12 @@ services:
       pmoves_ai: {}
   alertmanager:
     image: prom/alertmanager:latest
+    profiles: ["alerts"]
     ports:
       - "${ALERTMANAGER_PORT:-9093}:9093"
     volumes:
-      - ../../features/metrics/alertmanager.tmpl.yml:/etc/alertmanager/alertmanager.tmpl.yml:ro
-    environment:
-      SLACK_WEBHOOK_URL: ${SLACK_WEBHOOK_URL}
-      SLACK_CHANNEL: ${SLACK_CHANNEL:-#alerts}
-      GRAFANA_BASE_URL: ${GRAFANA_BASE_URL:-http://localhost:${GRAFANA_PORT:-3033}}
-    command: ["/bin/sh","-lc","envsubst < /etc/alertmanager/alertmanager.tmpl.yml > /etc/alertmanager/alertmanager.yml && /bin/alertmanager --config.file=/etc/alertmanager/alertmanager.yml --storage.path=/alertmanager"]
+      - ../../features/metrics/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+    command: ["--config.file=/etc/alertmanager/alertmanager.yml", "--storage.path=/alertmanager"]
     restart: unless-stopped
     networks:
       default: {}
@@ -49,6 +46,7 @@ services:
 
   alertmanager-discord:
     image: benjojo/alertmanager-discord:latest
+    profiles: ["alerts"]
     environment:
       DISCORD_WEBHOOK: ${DISCORD_WEBHOOK_URL}
     expose: ["9094"]
