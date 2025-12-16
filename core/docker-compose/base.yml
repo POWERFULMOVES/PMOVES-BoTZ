@@ -155,6 +155,22 @@ services:
     networks:
       - pmoves_ai
 
+  # 9. Hostinger Agent (VPS/DNS/Domain Management)
+  hostinger:
+    build:
+      context: ../../features/hostinger
+      dockerfile: Dockerfile
+    stdin_open: true
+    tty: true
+    environment:
+      - API_TOKEN=${HOSTINGER_API_KEY}
+      - HOSTINGER_API_KEY=${HOSTINGER_API_KEY}
+    labels:
+      pmoves.service: "hostinger"
+      pmoves.mcp: "true"
+    networks:
+      - pmoves_ai
+
 volumes:
   cipher_data:
   ts-state:

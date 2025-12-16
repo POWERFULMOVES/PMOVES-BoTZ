@@ -1,16 +1,20 @@
 mcpServers:
+  # Document Processing
   docling:
     url: http://localhost:3020/sse
     transport: sse
-  
+
+  # Code Execution Sandbox
   e2b:
     url: http://localhost:7071/sse
     transport: sse
 
+  # Vision-Language Guidance
   vl-sentinel:
     url: http://localhost:7072/sse
     transport: sse
 
+  # Persistent Memory & Reasoning
   cipher-memory:
     command: docker
     args:
@@ -22,6 +26,7 @@ mcpServers:
     env:
       VENICE_API_KEY: ${VENICE_API_KEY}
 
+  # API Testing & Collections
   postman:
     command: docker
     args:
@@ -33,3 +38,28 @@ mcpServers:
       - "--full"
     env:
       POSTMAN_API_KEY: ${POSTMAN_API_KEY}
+
+  # n8n Workflow Automation
+  n8n-agent:
+    command: docker
+    args:
+      - exec
+      - -i
+      - docker-compose-n8n-agent-1
+      - python
+      - app_n8n_agent.py
+    env:
+      N8N_API_KEY: ${N8N_API_KEY}
+      N8N_API_URL: ${N8N_API_URL:-http://n8n:5678/api/v1}
+      TENSORZERO_BASE_URL: ${TENSORZERO_BASE_URL:-http://tensorzero-gateway:3030}
+
+  # Hostinger VPS/DNS/Domain Management
+  hostinger:
+    command: docker
+    args:
+      - exec
+      - -i
+      - docker-compose-hostinger-1
+      - hostinger-api-mcp
+    env:
+      API_TOKEN: ${HOSTINGER_API_KEY}
