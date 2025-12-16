@@ -147,7 +147,15 @@ BOTZ_TOOLS: List[Dict[str, Any]] = [
 
 
 def store_to_cipher(content: str, tags: List[str]) -> str:
-    """Store content in cipher memory via CLI."""
+    """Store content in cipher memory via CLI.
+
+    Args:
+        content: The content to store in cipher memory
+        tags: List of tags for categorization (included in content)
+
+    Returns:
+        Result message from cipher CLI or error description
+    """
     cipher_path = os.environ.get(
         "CIPHER_PATH", "/app/features/cipher/pmoves_cipher/dist/src/app/index.cjs"
     )
@@ -165,8 +173,11 @@ def store_to_cipher(content: str, tags: List[str]) -> str:
         else:
             return f"[cipher not found] Would store: {content[:100]}..."
 
+    # Include tags in the stored content for searchability
+    tagged_content = f"[Tags: {', '.join(tags)}]\n{content}"
+
     try:
-        cmd = ["node", cipher_path, "--mode", "cli", f"Store: {content}"]
+        cmd = ["node", cipher_path, "--mode", "cli", f"Store: {tagged_content}"]
         result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
         return result.stdout.strip() if result.returncode == 0 else result.stderr.strip()
     except Exception as e:

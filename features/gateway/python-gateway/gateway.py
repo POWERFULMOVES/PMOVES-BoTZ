@@ -67,9 +67,6 @@ class MCPGateway:
 
     def __init__(self):
         self.upstream_servers = MCP_UPSTREAM_SERVERS
-        self._tools_cache: Dict[str, List[Dict]] = {}
-        self._cache_ttl = 300  # 5 minutes
-        self._last_cache_time = 0
 
     def _call_stdio_server(self, command: List[str], request: Dict) -> Dict:
         """Call an MCP server via stdio transport."""
