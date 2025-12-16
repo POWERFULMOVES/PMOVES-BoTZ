@@ -26,7 +26,10 @@ services:
     working_dir: /app
     volumes:
       - ../../features/gateway/python-gateway:/app
-    command: sh -c "pip install fastmcp && python gateway.py"
+      - /var/run/docker.sock:/var/run/docker.sock
+    command: sh -c "apt-get update && apt-get install -y docker.io && pip install pyyaml && python gateway.py"
+    ports:
+      - "2091:2091"
     environment:
       - PORT=2091
     networks:
