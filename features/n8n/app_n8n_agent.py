@@ -2,11 +2,17 @@
 """
 PMOVES n8n Agent - MCP Server for n8n Workflow Automation
 
-Provides full n8n workflow control via MCP protocol with cipher-memory
+Provides full n8n workflow control via MCP protocol with TensorZero-backed
+LLM inference for intelligent workflow suggestions and cipher-memory
 integration for skills storage, documentation, and reasoning traces.
 
 Transport: stdio (default) or HTTP
 Port: 7074 (when running HTTP mode)
+
+TensorZero Integration:
+- Uses local models (qwen2_5_14b) via TensorZero gateway
+- Provides intelligent workflow suggestions
+- Stores and retrieves automation patterns
 """
 
 from __future__ import annotations
@@ -23,6 +29,57 @@ from mcp import Tool
 from mcp.server import Server
 from mcp.types import CallToolResult, TextContent
 import mcp.server.stdio
+
+
+class TensorZeroClient:
+    """Client for TensorZero gateway LLM inference."""
+
+    def __init__(
+        self,
+        base_url: Optional[str] = None,
+        model: Optional[str] = None,
+    ) -> None:
+        self.base_url = (
+            base_url
+            or os.environ.get("TENSORZERO_BASE_URL", "http://tensorzero-gateway:3030")
+        ).rstrip("/")
+        self.model = model or os.environ.get("TENSORZERO_MODEL", "qwen2_5_14b")
+        self.api_key = os.environ.get("TENSORZERO_API_KEY", "")
+
+    async def chat(
+        self,
+        prompt: str,
+        system_prompt: Optional[str] = None,
+        temperature: float = 0.7,
+        max_tokens: int = 1024,
+    ) -> str:
+        """Send a chat completion request to TensorZero."""
+        messages = []
+        if system_prompt:
+            messages.append({"role": "system", "content": system_prompt})
+        messages.append({"role": "user", "content": prompt})
+
+        headers = {"Content-Type": "application/json"}
+        if self.api_key:
+            headers["Authorization"] = f"Bearer {self.api_key}"
+
+        try:
+            async with httpx.AsyncClient(timeout=60.0) as client:
+                response = await client.post(
+                    f"{self.base_url}/v1/chat/completions",
+                    headers=headers,
+                    json={
+                        "model": self.model,
+                        "messages": messages,
+                        "temperature": temperature,
+                        "max_tokens": max_tokens,
+                    },
+                )
+                response.raise_for_status()
+                data = response.json()
+                return data["choices"][0]["message"]["content"]
+        except Exception as e:
+            return f"[TensorZero error] {e}"
 
 
 class N8nClient:
@@ -117,13 +174,20 @@ class N8nClient:
 
 
 class CipherMemoryClient:
-    """Client for cipher-memory MCP server integration."""
+    """Client for cipher-memory MCP server integration with TensorZero LLM backend."""
 
-    def __init__(self, cipher_path: Optional[str] = None) -> None:
+    def __init__(
+        self,
+        cipher_path: Optional[str] = None,
+        tensorzero_client: Optional[TensorZeroClient] = None,
+    ) -> None:
         self.cipher_path = cipher_path or os.environ.get(
             "CIPHER_MEMORY_PATH", "/app/features/cipher/pmoves_cipher"
         )
         self.cipher_binary = f"{self.cipher_path}/dist/src/app/index.cjs"
+        self.llm = tensorzero_client or TensorZeroClient()
+        # In-memory skill storage (will be persisted via cipher when available)
+        self._skills_cache: List[Dict[str, Any]] = []
 
     def _run_cipher(self, prompt: str) -> str:
         """Run cipher CLI command."""
@@ -147,22 +211,90 @@ class CipherMemoryClient:
         self, workflow_name: str, description: str, tags: List[str]
     ) -> str:
         """Store workflow documentation in cipher memory."""
+        # Store in local cache
+        doc = {
+            "name": workflow_name,
+            "description": description,
+            "tags": tags,
+            "type": "n8n_workflow",
+        }
+        self._skills_cache.append(doc)
+
+        # Also try cipher storage
         prompt = f"""Store this workflow documentation:
 Name: {workflow_name}
 Description: {description}
 Tags: {', '.join(tags)}
 Type: n8n_workflow"""
-        return self._run_cipher(prompt)
+        cipher_result = self._run_cipher(prompt)
+        return f"Stored: {workflow_name} | Cipher: {cipher_result}"
+
+    async def search_skills_async(self, query: str, limit: int = 5) -> str:
+        """Search for automation skills/patterns using TensorZero LLM."""
+        # Search local cache first
+        cached_matches = [
+            s for s in self._skills_cache
+            if query.lower() in s.get("description", "").lower()
+            or query.lower() in s.get("name", "").lower()
+            or any(query.lower() in t.lower() for t in s.get("tags", []))
+        ][:limit]
+
+        # Build context from cached skills
+        cache_context = ""
+        if cached_matches:
+            cache_context = "Known workflows:\n" + "\n".join(
+                f"- {s['name']}: {s['description']}" for s in cached_matches
+            )
+
+        # Use TensorZero for intelligent search
+        system_prompt = """You are an n8n workflow automation expert.
+Search for automation patterns and suggest relevant workflows.
+Be concise and actionable."""
+
+        prompt = f"""Search for automation patterns related to: {query}
+Limit: {limit} results
+
+{cache_context}
+
+Return the most relevant automation patterns and workflow suggestions."""
+
+        return await self.llm.chat(prompt, system_prompt=system_prompt)
 
     def search_skills(self, query: str, limit: int = 5) -> str:
-        """Search for automation skills/patterns."""
-        prompt = f"Search for automation patterns related to: {query} (limit: {limit})"
-        return self._run_cipher(prompt)
+        """Synchronous wrapper for search_skills_async."""
+        # Try cipher first
+        cipher_result = self._run_cipher(
+            f"Search for automation patterns related to: {query} (limit: {limit})"
+        )
+        if "[cipher" not in cipher_result:
+            return cipher_result
+
+        # Fallback to cached results
+        cached_matches = [
+            s for s in self._skills_cache
+            if query.lower() in s.get("description", "").lower()
+            or query.lower() in s.get("name", "").lower()
+        ][:limit]
+
+        if cached_matches:
+            return json.dumps(cached_matches, indent=2)
+        return f"No cached skills found for: {query}"
 
     def store_reasoning(
         self, task: str, workflow_chosen: str, reasoning: str, outcome: str
     ) -> str:
         """Store reasoning for workflow selection."""
+        # Store in local cache for learning
+        reasoning_doc = {
+            "task": task,
+            "workflow": workflow_chosen,
+            "reasoning": reasoning,
+            "outcome": outcome,
+            "type": "n8n_reasoning",
+        }
+        self._skills_cache.append(reasoning_doc)
+
+        # Also try cipher storage
         prompt = f"""Store reasoning trace:
 Task: {task}
 Workflow Chosen: {workflow_chosen}
@@ -171,14 +303,51 @@ Outcome: {outcome}
 Type: n8n_reasoning"""
         return self._run_cipher(prompt)
 
+    async def suggest_workflow_async(
+        self, task_description: str, workflows: List[Dict[str, Any]]
+    ) -> str:
+        """Get workflow suggestion using TensorZero LLM."""
+        # Build context from available workflows
+        workflow_list = "\n".join(
+            f"- {w.get('name', 'unnamed')} (ID: {w.get('id', 'unknown')}, "
+            f"active: {w.get('active', False)})"
+            for w in workflows[:20]  # Limit context size
+        )
+
+        # Include past reasoning from cache
+        past_reasoning = [
+            s for s in self._skills_cache if s.get("type") == "n8n_reasoning"
+        ][-5:]  # Last 5 reasoning traces
+        reasoning_context = ""
+        if past_reasoning:
+            reasoning_context = "\nPast decisions:\n" + "\n".join(
+                f"- Task: {r['task']} -> Workflow: {r['workflow']} ({r['outcome']})"
+                for r in past_reasoning
+            )
+
+        system_prompt = """You are an n8n workflow automation expert.
+Analyze the task and suggest the best workflow from the available options.
+Consider past decisions and their outcomes.
+Be specific about which workflow to use and why."""
+
+        prompt = f"""Task: {task_description}
+
+Available workflows:
+{workflow_list}
+{reasoning_context}
+
+Which workflow should be used for this task? Explain your reasoning."""
+
+        return await self.llm.chat(prompt, system_prompt=system_prompt)
+
     def suggest_workflow(self, task_description: str) -> str:
-        """Get workflow suggestion based on task."""
+        """Synchronous suggest (uses cipher fallback)."""
         prompt = f"Based on past automation patterns, suggest the best n8n workflow for: {task_description}"
         return self._run_cipher(prompt)
 
 
 class N8nAgentServer:
-    """MCP server for n8n workflow automation with cipher integration."""
+    """MCP server for n8n workflow automation with TensorZero and cipher integration."""
 
     def __init__(self) -> None:
         self.server = Server("pmoves-n8n-agent")
@@ -186,7 +355,10 @@ class N8nAgentServer:
             base_url=os.environ.get("N8N_API_URL", "http://n8n:5678/api/v1"),
             api_key=os.environ.get("N8N_API_KEY", ""),
         )
-        self.cipher = CipherMemoryClient()
+        # Initialize TensorZero client for LLM inference
+        self.llm = TensorZeroClient()
+        # Pass TensorZero client to cipher for LLM-backed suggestions
+        self.cipher = CipherMemoryClient(tensorzero_client=self.llm)
 
     def setup_handlers(self) -> None:
         """Setup MCP tool handlers."""
@@ -513,7 +685,7 @@ class N8nAgentServer:
             )
             return json.dumps(executions, indent=2)
 
-        # Cipher-Enhanced Tools
+        # Cipher-Enhanced Tools (with TensorZero LLM backend)
         if name == "n8n_store_workflow_doc":
             result = self.cipher.store_workflow_doc(
                 args["workflow_name"],
@@ -523,11 +695,19 @@ class N8nAgentServer:
             return f"Stored documentation for '{args['workflow_name']}': {result}"
 
         if name == "n8n_search_skills":
-            result = self.cipher.search_skills(args["query"], args.get("limit", 5))
+            # Use TensorZero-backed async search
+            result = await self.cipher.search_skills_async(
+                args["query"], args.get("limit", 5)
+            )
             return f"Search results for '{args['query']}':\n{result}"
 
         if name == "n8n_suggest_workflow":
-            result = self.cipher.suggest_workflow(args["task_description"])
+            # Fetch available workflows for context
+            workflows = await self.n8n.list_workflows()
+            # Use TensorZero-backed async suggestion
+            result = await self.cipher.suggest_workflow_async(
+                args["task_description"], workflows
+            )
             return f"Workflow suggestion for '{args['task_description']}':\n{result}"
 
         if name == "n8n_learn_from_execution":

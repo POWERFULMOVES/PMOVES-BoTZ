@@ -127,6 +127,10 @@ services:
       - N8N_API_URL=${N8N_API_URL:-http://n8n:5678/api/v1}
       - N8N_API_KEY=${N8N_API_KEY}
       - CIPHER_MEMORY_PATH=/app/features/cipher/pmoves_cipher
+      # TensorZero integration for local LLM inference
+      - TENSORZERO_BASE_URL=${TENSORZERO_BASE_URL:-http://tensorzero-gateway:3030}
+      - TENSORZERO_MODEL=${TENSORZERO_MODEL:-qwen2_5_14b}
+      - TENSORZERO_API_KEY=${TENSORZERO_API_KEY:-}
     volumes:
       - ../../features/cipher/pmoves_cipher:/app/features/cipher/pmoves_cipher:ro
     depends_on:
