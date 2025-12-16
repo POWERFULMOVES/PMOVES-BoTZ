@@ -1,209 +1,343 @@
 #!/usr/bin/env python3
 """
-Local MCP Gateway implementation to fix FastMCP version parameter issue.
-This replaces the installed mcp-gateway package with a corrected version.
+MCP Gateway - Unified tool routing for BoTZ agents.
+
+Routes tool calls to upstream MCP servers (n8n-agent, hostinger, cipher-memory,
+e2b, vl-sentinel, docling) via a single endpoint on port 2091.
 """
 
 import asyncio
-import logging
-import sys
 import json
+import logging
+import os
+import subprocess
+import sys
 from contextlib import asynccontextmanager
+from http.server import HTTPServer, BaseHTTPRequestHandler
 from typing import Any, Dict, List, Optional
+from urllib.request import urlopen, Request
+from urllib.error import URLError
 
 import yaml
 
 # Configure logging
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s'
+)
 logger = logging.getLogger(__name__)
 
-@asynccontextmanager
-async def lifespan(app):
-    """Lifespan context manager for MCP server."""
-    logger.info("MCP Gateway starting up...")
-    yield
-    logger.info("MCP Gateway shutting down...")
+# Upstream MCP server configurations
+MCP_UPSTREAM_SERVERS = {
+    "n8n-agent": {
+        "transport": "stdio",
+        "command": ["docker", "exec", "-i", "docker-compose-n8n-agent-1", "python", "app_n8n_agent.py"],
+        "description": "n8n Workflow Automation Agent"
+    },
+    "hostinger": {
+        "transport": "stdio",
+        "command": ["docker", "exec", "-i", "docker-compose-hostinger-1", "hostinger-api-mcp"],
+        "description": "Hostinger VPS/DNS/Domain Management"
+    },
+    "cipher-memory": {
+        "transport": "http",
+        "url": "http://cipher-memory:8081",
+        "description": "Persistent Memory & Reasoning"
+    },
+    "e2b": {
+        "transport": "http",
+        "url": "http://e2b-runner:7071",
+        "description": "E2B Code Sandbox"
+    },
+    "vl-sentinel": {
+        "transport": "http",
+        "url": "http://vl-sentinel:7072",
+        "description": "Vision-Language Guidance"
+    },
+    "docling": {
+        "transport": "sse",
+        "url": "http://docling-mcp:3020/sse",
+        "description": "Document Processing"
+    },
+}
 
-class GatewayMCP:
-    """MCP Gateway implementation using FastMCP without version parameter."""
-    
+
+class MCPGateway:
+    """MCP Gateway that routes tool calls to upstream servers."""
+
     def __init__(self):
-        # Try to import FastMCP from the virtual environment
+        self.upstream_servers = MCP_UPSTREAM_SERVERS
+        self._tools_cache: Dict[str, List[Dict]] = {}
+        self._cache_ttl = 300  # 5 minutes
+        self._last_cache_time = 0
+
+    def _call_stdio_server(self, command: List[str], request: Dict) -> Dict:
+        """Call an MCP server via stdio transport."""
         try:
-            sys.path.insert(0, '/app/venv/lib/python3.11/site-packages')
-            from fastmcp import FastMCP
-            self.mcp = FastMCP("MCP Gateway", lifespan=lifespan)
-            self._setup_tools()
-            logger.info("FastMCP imported successfully")
-        except ImportError as e:
-            logger.error(f"Failed to import FastMCP: {e}")
-            # Fallback to simple HTTP server with health endpoint
-            self.mcp = None
-    
-    def _setup_tools(self):
-        """Setup gateway tools."""
-        
-        @self.mcp.tool
-        async def list_servers() -> List[Dict[str, Any]]:
-            """List all available MCP servers from catalog."""
+            proc = subprocess.Popen(
+                command,
+                stdin=subprocess.PIPE,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True
+            )
+
+            request_json = json.dumps(request) + "\n"
+            stdout, stderr = proc.communicate(input=request_json, timeout=60)
+
+            # Parse response - skip log lines
+            for line in stdout.strip().split('\n'):
+                if line.startswith('{'):
+                    return json.loads(line)
+
+            return {"error": f"No valid JSON response. stderr: {stderr[:500]}"}
+        except subprocess.TimeoutExpired:
+            proc.kill()
+            return {"error": "Request timed out"}
+        except Exception as e:
+            return {"error": str(e)}
+
+    def _call_http_server(self, url: str, request: Dict) -> Dict:
+        """Call an MCP server via HTTP transport."""
+        try:
+            req = Request(
+                url,
+                data=json.dumps(request).encode(),
+                headers={"Content-Type": "application/json"}
+            )
+            with urlopen(req, timeout=30) as resp:
+                return json.loads(resp.read().decode())
+        except URLError as e:
+            return {"error": f"HTTP error: {e}"}
+        except Exception as e:
+            return {"error": str(e)}
+
+    def list_upstream_servers(self) -> List[Dict[str, Any]]:
+        """List all configured upstream MCP servers."""
+        servers = []
+        for name, config in self.upstream_servers.items():
+            servers.append({
+                "name": name,
+                "transport": config["transport"],
+                "description": config.get("description", ""),
+                "status": "configured"
+            })
+        return servers
+
+    def get_tools_from_server(self, server_name: str) -> List[Dict]:
+        """Get tools from a specific upstream server."""
+        if server_name not in self.upstream_servers:
+            return []
+
+        config = self.upstream_servers[server_name]
+        request = {
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "tools/list",
+            "params": {}
+        }
+
+        if config["transport"] == "stdio":
+            response = self._call_stdio_server(config["command"], request)
+        elif config["transport"] in ("http", "sse"):
+            response = self._call_http_server(config["url"], request)
+        else:
+            return []
+
+        if "result" in response and "tools" in response["result"]:
+            tools = response["result"]["tools"]
+            # Prefix tool names with server name for routing
+            for tool in tools:
+                tool["_server"] = server_name
+                tool["qualified_name"] = f"{server_name}:{tool.get('name', tool.get('id', ''))}"
+            return tools
+
+        return []
+
+    def get_all_tools(self) -> List[Dict]:
+        """Get aggregated tools from all upstream servers."""
+        all_tools = []
+        for server_name in self.upstream_servers:
             try:
-                with open('/app/mcp_catalog_multi.yaml', 'r') as f:
-                    catalog = yaml.safe_load(f)
-                
-                servers = []
-                if 'mcpServers' in catalog:
-                    for name, config in catalog['mcpServers'].items():
-                        servers.append({
-                            'name': name,
-                            'command': config.get('command', ''),
-                            'args': config.get('args', []),
-                            'env': config.get('env', {})
-                        })
-                
-                return servers
+                tools = self.get_tools_from_server(server_name)
+                all_tools.extend(tools)
+                logger.info(f"Loaded {len(tools)} tools from {server_name}")
             except Exception as e:
-                logger.error(f"Error reading catalog: {e}")
-                return []
-        
-        @self.mcp.tool
-        async def get_server_info(server_name: str) -> Dict[str, Any]:
-            """Get information about a specific MCP server."""
-            try:
-                with open('/app/mcp_catalog_multi.yaml', 'r') as f:
-                    catalog = yaml.safe_load(f)
-                
-                if 'mcpServers' in catalog and server_name in catalog['mcpServers']:
-                    return catalog['mcpServers'][server_name]
-                else:
-                    return {'error': f'Server {server_name} not found'}
-            except Exception as e:
-                logger.error(f"Error getting server info: {e}")
-                return {'error': str(e)}
-        
-        @self.mcp.tool
-        async def health_check_tool() -> Dict[str, Any]:
-            """Health check tool for MCP Gateway."""
-            return {
+                logger.warning(f"Failed to get tools from {server_name}: {e}")
+        return all_tools
+
+    def call_tool(self, qualified_name: str, arguments: Dict) -> Dict:
+        """Call a tool on the appropriate upstream server."""
+        # Parse qualified name (server:tool_name)
+        if ":" in qualified_name:
+            server_name, tool_name = qualified_name.split(":", 1)
+        else:
+            # Try to find the tool in any server
+            tool_name = qualified_name
+            server_name = None
+            for sname in self.upstream_servers:
+                tools = self.get_tools_from_server(sname)
+                for tool in tools:
+                    if tool.get("name") == tool_name or tool.get("id") == tool_name:
+                        server_name = sname
+                        break
+                if server_name:
+                    break
+
+        if not server_name or server_name not in self.upstream_servers:
+            return {"error": f"Server not found for tool: {qualified_name}"}
+
+        config = self.upstream_servers[server_name]
+        request = {
+            "jsonrpc": "2.0",
+            "id": 2,
+            "method": "tools/call",
+            "params": {
+                "name": tool_name,
+                "arguments": arguments
+            }
+        }
+
+        if config["transport"] == "stdio":
+            return self._call_stdio_server(config["command"], request)
+        elif config["transport"] in ("http", "sse"):
+            return self._call_http_server(config["url"], request)
+
+        return {"error": f"Unsupported transport: {config['transport']}"}
+
+
+class GatewayHTTPHandler(BaseHTTPRequestHandler):
+    """HTTP request handler for MCP Gateway."""
+
+    gateway = MCPGateway()
+
+    def _send_json(self, status: int, data: Dict):
+        """Send JSON response."""
+        self.send_response(status)
+        self.send_header('Content-Type', 'application/json')
+        self.send_header('Access-Control-Allow-Origin', '*')
+        self.end_headers()
+        self.wfile.write(json.dumps(data, indent=2).encode())
+
+    def do_OPTIONS(self):
+        """Handle CORS preflight."""
+        self.send_response(200)
+        self.send_header('Access-Control-Allow-Origin', '*')
+        self.send_header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
+        self.send_header('Access-Control-Allow-Headers', 'Content-Type')
+        self.end_headers()
+
+    def do_GET(self):
+        """Handle GET requests."""
+        if self.path == '/health':
+            self._send_json(200, {
                 "status": "healthy",
                 "service": "MCP Gateway",
-                "version": "1.0.0",
-                "timestamp": "2025-11-10T03:38:00Z"
-            }
-    
-    def run(self, host: str = "0.0.0.0", port: int = 2091):
-        """Run MCP Gateway server."""
-        logger.info(f"Starting MCP Gateway on {host}:{port}")
-        
-        # Always run simple HTTP server with health endpoint for now
-        # This ensures the health check works reliably
-        self._run_simple_server(host, port)
-    
-    def _run_simple_server(self, host: str, port: int):
-        """Run simple HTTP server with health endpoint."""
-        from http.server import HTTPServer, BaseHTTPRequestHandler
-        import json
-        
-        class HealthHandler(BaseHTTPRequestHandler):
-            def do_GET(self):
-                if self.path == '/health':
-                    self.send_response(200)
-                    self.send_header('Content-type', 'application/json')
-                    self.end_headers()
-                    response = {
-                        "status": "healthy",
-                        "service": "MCP Gateway",
-                        "version": "1.0.0"
-                    }
-                    self.wfile.write(json.dumps(response).encode())
-                elif self.path == '/tools':
-                    self.send_response(200)
-                    self.send_header('Content-type', 'application/json')
-                    self.end_headers()
-                    response = {
-                        "tools": [
-                            {
-                                "name": "list_servers",
-                                "description": "List all available MCP servers from catalog",
-                                "inputSchema": {
-                                    "type": "object",
-                                    "properties": {},
-                                    "required": []
-                                }
-                            },
-                            {
-                                "name": "get_server_info",
-                                "description": "Get information about a specific MCP server",
-                                "inputSchema": {
-                                    "type": "object",
-                                    "properties": {
-                                        "server_name": {
-                                            "type": "string",
-                                            "description": "Name of the MCP server"
-                                        }
-                                    },
-                                    "required": ["server_name"]
-                                }
-                            },
-                            {
-                                "name": "health_check_tool",
-                                "description": "Health check tool for MCP Gateway",
-                                "inputSchema": {
-                                    "type": "object",
-                                    "properties": {},
-                                    "required": []
-                                }
-                            }
-                        ]
-                    }
-                    self.wfile.write(json.dumps(response).encode())
-                else:
-                    self.send_response(404)
-                    self.end_headers()
-            
-            def log_message(self, format, *args):
-                # Suppress default logging
-                pass
-        
-        server = HTTPServer((host, port), HealthHandler)
-        logger.info(f"Starting simple HTTP server with health endpoint on {host}:{port}")
-        server.serve_forever()
-    
-    def _run_with_health(self, host: str, port: int):
-        """Run with health endpoint."""
+                "version": "2.0.0",
+                "upstream_servers": len(self.gateway.upstream_servers)
+            })
+
+        elif self.path == '/servers':
+            servers = self.gateway.list_upstream_servers()
+            self._send_json(200, {"servers": servers})
+
+        elif self.path == '/tools':
+            tools = self.gateway.get_all_tools()
+            self._send_json(200, {
+                "tools": tools,
+                "count": len(tools)
+            })
+
+        elif self.path.startswith('/tools/'):
+            server_name = self.path.split('/')[2]
+            tools = self.gateway.get_tools_from_server(server_name)
+            self._send_json(200, {
+                "server": server_name,
+                "tools": tools,
+                "count": len(tools)
+            })
+
+        else:
+            self._send_json(404, {"error": "Not found"})
+
+    def do_POST(self):
+        """Handle POST requests."""
+        content_length = int(self.headers.get('Content-Length', 0))
+        body = self.rfile.read(content_length).decode() if content_length > 0 else '{}'
+
         try:
-            # First, start the simple HTTP server with health endpoint
-            import threading
-            import time
-            
-            def run_simple_server():
-                self._run_simple_server(host, port + 1)  # Use different port to avoid conflict
-            
-            # Start simple server in background
-            simple_server_thread = threading.Thread(target=run_simple_server, daemon=True)
-            simple_server_thread.start()
-            time.sleep(2)  # Give it time to start
-            
-            # Try to start FastMCP server
-            try:
-                self.mcp.run(transport="http", host=host, port=port)
-            except Exception as e:
-                logger.error(f"Error starting FastMCP server: {e}")
-                # If FastMCP fails, just run the simple server on the main port
-                logger.info("Falling back to simple HTTP server on main port")
-                self._run_simple_server(host, port)
-        except Exception as e:
-            logger.error(f"Error in _run_with_health: {e}")
-            # Fallback to simple server
-            self._run_simple_server(host, port)
+            data = json.loads(body)
+        except json.JSONDecodeError:
+            self._send_json(400, {"error": "Invalid JSON"})
+            return
+
+        if self.path == '/call':
+            # Tool call endpoint
+            tool_name = data.get('tool') or data.get('name')
+            arguments = data.get('arguments', {})
+
+            if not tool_name:
+                self._send_json(400, {"error": "Missing tool name"})
+                return
+
+            result = self.gateway.call_tool(tool_name, arguments)
+            self._send_json(200, result)
+
+        elif self.path == '/mcp':
+            # MCP JSON-RPC endpoint
+            method = data.get('method')
+            params = data.get('params', {})
+            req_id = data.get('id', 1)
+
+            if method == 'tools/list':
+                tools = self.gateway.get_all_tools()
+                self._send_json(200, {
+                    "jsonrpc": "2.0",
+                    "id": req_id,
+                    "result": {"tools": tools}
+                })
+
+            elif method == 'tools/call':
+                tool_name = params.get('name')
+                arguments = params.get('arguments', {})
+                result = self.gateway.call_tool(tool_name, arguments)
+                self._send_json(200, {
+                    "jsonrpc": "2.0",
+                    "id": req_id,
+                    "result": result.get('result', result)
+                })
+
+            else:
+                self._send_json(400, {
+                    "jsonrpc": "2.0",
+                    "id": req_id,
+                    "error": {"code": -32601, "message": f"Method not found: {method}"}
+                })
+
+        else:
+            self._send_json(404, {"error": "Not found"})
+
+    def log_message(self, format, *args):
+        """Log HTTP requests."""
+        logger.info(f"{self.address_string()} - {format % args}")
+
 
 def main():
-    """Main entry point for gateway."""
+    """Main entry point for MCP Gateway."""
+    host = os.environ.get('HOST', '0.0.0.0')
+    port = int(os.environ.get('PORT', '2091'))
+
+    logger.info(f"Starting MCP Gateway on {host}:{port}")
+    logger.info(f"Configured upstream servers: {list(MCP_UPSTREAM_SERVERS.keys())}")
+
+    server = HTTPServer((host, port), GatewayHTTPHandler)
+
     try:
-        gateway = GatewayMCP()
-        gateway.run()
-    except Exception as e:
-        logger.error(f"Failed to start gateway: {e}")
-        sys.exit(1)
+        server.serve_forever()
+    except KeyboardInterrupt:
+        logger.info("Shutting down MCP Gateway...")
+        server.shutdown()
+
 
 if __name__ == "__main__":
     main()
