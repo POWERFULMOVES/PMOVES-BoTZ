@@ -23,12 +23,15 @@ ROOT_ENV := .env
 EXAMPLE_ENV := core/example.env
 
 # Compose configuration (order matters - matches bring_up_pmoves_botz.sh)
+# Note: metrics excluded by default - use parent PMOVES.AI monitoring stack
 COMPOSE_BASE := core/docker-compose/base.yml
 COMPOSE_FILES := -f $(COMPOSE_BASE) \
                  -f features/pro/docker-compose.yml \
                  -f features/network/external.yml \
-                 -f features/metrics/docker-compose.yml \
                  -f features/cipher/docker-compose.yml
+
+# Include metrics if running standalone (not alongside parent PMOVES.AI)
+COMPOSE_FILES_WITH_METRICS := $(COMPOSE_FILES) -f features/metrics/docker-compose.yml
 
 # Service ports (defaults)
 GATEWAY_PORT ?= 2091
@@ -149,10 +152,11 @@ wait-healthy: ## Wait for services to become healthy
 
 health-check: ## Quick health check of all services
 	@echo "Checking service health..."
-	@curl -fsS http://localhost:$(GATEWAY_PORT)/ready >/dev/null 2>&1 && echo "  Gateway ($(GATEWAY_PORT)): OK" || echo "  Gateway ($(GATEWAY_PORT)): FAIL"
+	@curl -fsS http://localhost:$(GATEWAY_PORT)/health >/dev/null 2>&1 && echo "  Gateway ($(GATEWAY_PORT)): OK" || echo "  Gateway ($(GATEWAY_PORT)): FAIL"
 	@curl -fsS http://localhost:$(DOCLING_PORT)/health >/dev/null 2>&1 && echo "  Docling ($(DOCLING_PORT)): OK" || echo "  Docling ($(DOCLING_PORT)): FAIL"
-	@curl -fsS http://localhost:$(CIPHER_API_PORT)/health >/dev/null 2>&1 && echo "  Cipher ($(CIPHER_API_PORT)): OK" || echo "  Cipher ($(CIPHER_API_PORT)): FAIL"
 	@curl -fsS http://localhost:$(VL_PORT)/health >/dev/null 2>&1 && echo "  VL-Sentinel ($(VL_PORT)): OK" || echo "  VL-Sentinel ($(VL_PORT)): FAIL"
+	@curl -fsS http://localhost:7071/health >/dev/null 2>&1 && echo "  E2B-Runner (7071): OK" || echo "  E2B-Runner (7071): FAIL"
+	@docker exec docker-compose-cipher-memory-1 curl -fsS http://localhost:8081/health >/dev/null 2>&1 && echo "  Cipher (internal): OK" || echo "  Cipher (internal): SKIP (internal service)"
 
 # ============================================================================
 # Testing

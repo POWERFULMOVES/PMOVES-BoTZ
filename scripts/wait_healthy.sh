@@ -12,11 +12,12 @@ TIMEOUT=${WAIT_TIMEOUT:-120}
 INTERVAL=${WAIT_INTERVAL:-5}
 
 # Service endpoints to check (name:port:path)
+# Note: Cipher-memory is internal (port 8081, not exposed) - check via MCP Gateway
 SERVICES=(
-    "Gateway:2091:/ready"
+    "Gateway:2091:/health"
     "Docling:3020:/health"
-    "Cipher-API:3011:/health"
     "VL-Sentinel:7072:/health"
+    "E2B-Runner:7071:/health"
 )
 
 # Colors
