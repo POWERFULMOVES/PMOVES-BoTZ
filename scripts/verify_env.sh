@@ -1,10 +1,15 @@
-#!/bin/bash
+#!/usr/bin/env bash
+# PMOVES-BoTZ Environment Variable Verification Script
+#
+# Usage: ./scripts/verify_env.sh
+#
+# Verifies all required environment variables are properly configured
+# before starting services or running e2e tests.
 
-# PMOVES MCP Environment Verification Script
-# This script verifies that all required environment variables are properly configured
+set -euo pipefail
 
-echo "=== PMOVES MCP Environment Variable Verification ==="
-echo ""
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+BOTZ_ROOT="$(dirname "$SCRIPT_DIR")"
 
 # Colors for output
 RED='\033[0;31m'
@@ -12,107 +17,129 @@ GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
 
-# Function to check if variable exists and is not empty
-check_var() {
-    local var_name=$1
-    local var_value=${!var_name}
-    
-    if [ -z "$var_value" ]; then
-        echo -e "${RED}❌ $var_name is not set or empty${NC}"
-        return 1
-    else
-        echo -e "${GREEN}✅ $var_name is set${NC}"
-        return 0
-    fi
-}
-
-# Function to check if variable exists in docker-compose
-check_docker_compose_var() {
-    local var_name=$1
-    local file="docker-compose.mcp-pro.yml"
-    
-    if grep -q "\${$var_name}" "$file"; then
-        echo -e "${GREEN}✅ $var_name is referenced in docker-compose.mcp-pro.yml${NC}"
-        return 0
-    else
-        echo -e "${YELLOW}⚠️  $var_name is not referenced in docker-compose.mcp-pro.yml${NC}"
-        return 1
-    fi
-}
-
-echo "Checking required environment variables..."
+echo "=== PMOVES-BoTZ Environment Verification ==="
 echo ""
 
-# Required variables for MCP services
-required_vars=(
-    "OPENAI_API_KEY"
-    "VENICE_API_KEY"
-    "TAILSCALE_AUTHKEY"
-    "E2B_API_KEY"
-    "PMOVES_ROOT"
+# Load environment from .env
+if [[ -f "${BOTZ_ROOT}/.env" ]]; then
+    echo "Loading .env..."
+    set -a
+    # shellcheck source=/dev/null
+    source "${BOTZ_ROOT}/.env"
+    set +a
+else
+    echo "Warning: .env not found at ${BOTZ_ROOT}/.env"
+    echo "Run 'make env-init' to create it."
+fi
+
+echo ""
+
+# Required variables
+declare -A REQUIRED_VARS=(
+    ["CIPHER_ENCRYPTION_KEY"]="64 hex chars for cipher encryption"
 )
 
-# Load environment from files
-if [ -f ".env" ]; then
-    echo "Loading environment from .env..."
-    set -a
-    source .env
-    set +a
-fi
+# LLM provider keys - at least one should be set
+LLM_KEYS=("VENICE_API_KEY" "OPENAI_API_KEY" "ANTHROPIC_API_KEY" "GROQ_API_KEY")
 
-if [ -f ".env.local" ]; then
-    echo "Loading environment from .env.local..."
-    set -a
-    source .env.local
-    set +a
-fi
+# Optional but recommended for full functionality
+declare -A OPTIONAL_VARS=(
+    ["N8N_API_KEY"]="n8n workflow automation API key"
+    ["TENSORZERO_URL"]="TensorZero gateway URL"
+    ["OLLAMA_BASE_URL"]="Local Ollama for local-first mode"
+    ["E2B_API_KEY"]="E2B sandbox API key"
+    ["TAILSCALE_AUTHKEY"]="Tailscale VPN auth key"
+    ["HOSTINGER_API_KEY"]="Hostinger VPS/DNS management"
+)
 
-if [ -f "env.shared" ]; then
-    echo "Loading environment from env.shared..."
-    set -a
-    source env.shared
-    set +a
-fi
+MISSING=0
+WARNINGS=0
 
-echo ""
+# Check function
+check_var() {
+    local var_name=$1
+    local value="${!var_name:-}"
 
-# Check each required variable
-all_vars_set=true
-for var in "${required_vars[@]}"; do
+    if [[ -z "$value" || "$value" == "CHANGE_ME"* || "$value" == "test_"* || "$value" == "your_"* ]]; then
+        return 1
+    fi
+    return 0
+}
+
+# Check required vars
+echo "Checking required variables..."
+for var in "${!REQUIRED_VARS[@]}"; do
+    desc="${REQUIRED_VARS[$var]}"
+    value="${!var:-}"
+
     if ! check_var "$var"; then
-        all_vars_set=false
+        echo -e "  ${RED}[FAIL]${NC} $var: MISSING - $desc"
+        MISSING=$((MISSING + 1))
+    else
+        # Validate CIPHER_ENCRYPTION_KEY length
+        if [[ "$var" == "CIPHER_ENCRYPTION_KEY" && ${#value} -ne 64 ]]; then
+            echo -e "  ${RED}[FAIL]${NC} $var: Invalid (must be 64 hex chars, got ${#value})"
+            MISSING=$((MISSING + 1))
+        else
+            echo -e "  ${GREEN}[OK]${NC}   $var: configured"
+        fi
     fi
 done
 
+# Check LLM provider keys (at least one required)
 echo ""
-echo "Checking docker-compose configuration..."
-echo ""
-
-# Check if variables are properly referenced in docker-compose
-for var in "${required_vars[@]}"; do
-    check_docker_compose_var "$var"
+echo "Checking LLM provider keys (at least one required)..."
+llm_configured=0
+for var in "${LLM_KEYS[@]}"; do
+    if check_var "$var"; then
+        echo -e "  ${GREEN}[OK]${NC}   $var: configured"
+        llm_configured=$((llm_configured + 1))
+    else
+        echo -e "  ${YELLOW}[--]${NC}   $var: not set"
+    fi
 done
 
-echo ""
-echo "=== Verification Summary ==="
-echo ""
+if [[ $llm_configured -eq 0 ]]; then
+    echo -e "  ${RED}[FAIL]${NC} No LLM provider key configured!"
+    echo "         Set at least one of: ${LLM_KEYS[*]}"
+    MISSING=$((MISSING + 1))
+fi
 
-if [ "$all_vars_set" = true ]; then
-    echo -e "${GREEN}✅ All required environment variables are set!${NC}"
+# Check optional vars
+echo ""
+echo "Checking optional variables..."
+for var in "${!OPTIONAL_VARS[@]}"; do
+    desc="${OPTIONAL_VARS[$var]}"
+
+    if check_var "$var"; then
+        echo -e "  ${GREEN}[OK]${NC}   $var: configured"
+    else
+        echo -e "  ${YELLOW}[WARN]${NC} $var: not set - $desc"
+        WARNINGS=$((WARNINGS + 1))
+    fi
+done
+
+# Summary
+echo ""
+echo "============================================"
+if [[ $MISSING -gt 0 ]]; then
+    echo -e "${RED}VERIFICATION FAILED: $MISSING required variable(s) missing${NC}"
+    echo ""
+    echo "To fix:"
+    echo "  1. Run 'make env-sync' to sync from parent repo"
+    echo "  2. Or manually configure missing values in .env"
+    echo ""
+    echo "For CIPHER_ENCRYPTION_KEY, generate with:"
+    echo "  openssl rand -hex 32"
+    exit 1
+fi
+
+if [[ $WARNINGS -gt 0 ]]; then
+    echo -e "${GREEN}VERIFICATION PASSED${NC} with ${YELLOW}$WARNINGS warning(s)${NC}"
+    echo "Some optional features may not work without these keys."
 else
-    echo -e "${RED}❌ Some environment variables are missing. Please check the configuration.${NC}"
+    echo -e "${GREEN}VERIFICATION PASSED - All variables configured${NC}"
 fi
 
 echo ""
-echo "=== Next Steps ==="
-echo ""
-echo "1. If any variables are missing, add them to the appropriate .env file"
-echo "2. Restart the MCP services with:"
-echo "   docker-compose -f docker-compose.mcp-pro.yml down"
-echo "   docker-compose -f docker-compose.mcp-pro.yml up -d"
-echo ""
-echo "3. Check service logs to verify everything is working:"
-echo "   docker-compose -f docker-compose.mcp-pro.yml logs tailscale"
-echo "   docker-compose -f docker-compose.mcp-pro.yml logs mcp-gateway"
-echo "   docker-compose -f docker-compose.mcp-pro.yml logs cipher-memory"
-echo ""
+echo "Ready to start services with: make up"
