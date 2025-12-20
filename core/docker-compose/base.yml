@@ -178,7 +178,22 @@ volumes:
   cipher_data:
   ts-state:
 
+  # 8. TensorZero (Gateway/Inference)
+  tensorzero:
+    image: tensorzero/tensorzero:latest
+    environment:
+      - PORT=3000
+    ports:
+      - "3000:3000"
+    networks:
+      - pmoves_ai
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: unless-stopped
+
 networks:
   pmoves_ai:
-    name: pmoves_ai
     driver: bridge
