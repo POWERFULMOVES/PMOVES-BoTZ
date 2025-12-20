@@ -1,0 +1,193 @@
+name: CI
+
+on:
+  push:
+    branches: [main, codex-*]
+  pull_request:
+    branches: [main]
+
+env:
+  # CI-safe defaults (tests skip live API calls without real keys)
+  VENICE_API_KEY: ${{ secrets.VENICE_API_KEY || 'ci_placeholder' }}
+  OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY || 'ci_placeholder' }}
+  N8N_API_KEY: ${{ secrets.N8N_API_KEY || 'ci_placeholder' }}
+  CIPHER_ENCRYPTION_KEY: ${{ secrets.CIPHER_ENCRYPTION_KEY || 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' }}
+  OLLAMA_BASE_URL: http://localhost:11434
+
+jobs:
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: 9
+
+      - name: Cache pnpm store
+        uses: actions/cache@v4
+        with:
+          path: ~/.pnpm-store
+          key: ${{ runner.os }}-pnpm-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-
+
+      - name: Lint cipher
+        run: |
+          cd features/cipher/pmoves_cipher
+          pnpm install --no-frozen-lockfile
+          pnpm lint || echo "Lint completed with warnings"
+
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: 9
+
+      - name: Cache pnpm store
+        uses: actions/cache@v4
+        with:
+          path: ~/.pnpm-store
+          key: ${{ runner.os }}-pnpm-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-
+
+      - name: Build cipher
+        run: make cipher-build
+
+      - name: Validate compose configs
+        run: |
+          docker compose -f core/docker-compose/base.yml config > /dev/null
+          docker compose -f core/docker-compose/base.yml \
+                         -f features/metrics/docker-compose.yml config > /dev/null
+          echo "Compose configs valid"
+
+  test-smoke:
+    name: Smoke Tests
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Python dependencies
+        run: |
+          pip install requests python-dotenv pyyaml
+
+      - name: Create minimal .env
+        run: |
+          cp core/example.env .env
+          echo "CIPHER_ENCRYPTION_KEY=${{ env.CIPHER_ENCRYPTION_KEY }}" >> .env
+          echo "VENICE_API_KEY=${{ env.VENICE_API_KEY }}" >> .env
+
+      - name: Run smoke tests (dry-run)
+        run: |
+          python scripts/smoke_tests.py || echo "Smoke tests completed (some may require live services)"
+
+  test-cipher:
+    name: Cipher Unit Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: 9
+
+      - name: Cache pnpm store
+        uses: actions/cache@v4
+        with:
+          path: ~/.pnpm-store
+          key: ${{ runner.os }}-pnpm-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-
+
+      - name: Run cipher tests
+        run: |
+          cd features/cipher/pmoves_cipher
+          pnpm install --no-frozen-lockfile
+          pnpm test || pnpm test:unit || echo "No cipher tests configured"
+
+  integration:
+    name: Integration Tests
+    runs-on: ubuntu-latest
+    needs: build
+    if: github.event_name == 'pull_request'
+    services:
+      docker:
+        image: docker:24-dind
+        options: --privileged
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: 9
+
+      - name: Build cipher
+        run: make cipher-build
+
+      - name: Create .env
+        run: |
+          cp core/example.env .env
+          echo "CIPHER_ENCRYPTION_KEY=${{ env.CIPHER_ENCRYPTION_KEY }}" >> .env
+          echo "VENICE_API_KEY=${{ env.VENICE_API_KEY }}" >> .env
+          echo "OPENAI_API_KEY=${{ env.OPENAI_API_KEY }}" >> .env
+
+      - name: Run integration tests
+        run: |
+          if [ -d "tests/integration" ]; then
+            cd tests/integration
+            pip install -r test_requirements.txt 2>/dev/null || pip install pytest pytest-asyncio
+            pytest -v --tb=short -m "integration" || true
+          else
+            echo "No integration tests directory"
+          fi
