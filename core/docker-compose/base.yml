@@ -174,10 +174,6 @@ services:
     networks:
       - pmoves_ai
 
-volumes:
-  cipher_data:
-  ts-state:
-
   # 8. TensorZero (Gateway/Inference)
   tensorzero:
     image: tensorzero/tensorzero:latest
@@ -185,6 +181,8 @@ volumes:
       - PORT=3000
     ports:
       - "3000:3000"
+    volumes:
+      - ../../config/tensorzero.toml:/app/config.toml
     networks:
       - pmoves_ai
     healthcheck:
@@ -193,6 +191,10 @@ volumes:
       timeout: 10s
       retries: 3
     restart: unless-stopped
+
+volumes:
+  cipher_data:
+  ts-state:
 
 networks:
   pmoves_ai:
