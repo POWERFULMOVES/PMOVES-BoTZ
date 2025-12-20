@@ -10,7 +10,7 @@
 - Config: `features/metrics/prometheus.yml`
 - Rules: `features/metrics/prometheus.rules.yml`
 - Scrapes:
-  - `mcp-gateway:8000/metrics`
+  - `mcp-gateway:2091/metrics`
   - `docling-mcp:3020/metrics`
   - Blackbox probes via `host.docker.internal:9115`
 

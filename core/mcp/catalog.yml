@@ -20,7 +20,7 @@ mcpServers:
     args:
       - exec
       - -i
-      - pmoves-botz_cipher
+      - pmz-cipher
       - python3
       - memory_shim/app_cipher_memory.py
     env:
@@ -32,7 +32,7 @@ mcpServers:
     args:
       - exec
       - -i
-      - pmoves-botz_postman-mcp-local
+      - pmz-postman
       - npx
       - "@postman/postman-mcp-server@latest"
       - "--full"
@@ -45,13 +45,13 @@ mcpServers:
     args:
       - exec
       - -i
-      - docker-compose-n8n-agent-1
+      - pmz-n8n
       - python
       - app_n8n_agent.py
     env:
       N8N_API_KEY: ${N8N_API_KEY}
       N8N_API_URL: ${N8N_API_URL:-http://n8n:5678/api/v1}
-      TENSORZERO_BASE_URL: ${TENSORZERO_BASE_URL:-http://tensorzero-gateway:3030}
+      TENSORZERO_BASE_URL: ${TENSORZERO_BASE_URL:-http://tensorzero:3000}
 
   # Hostinger VPS/DNS/Domain Management
   hostinger:
@@ -59,7 +59,7 @@ mcpServers:
     args:
       - exec
       - -i
-      - docker-compose-hostinger-1
+      - pmz-hostinger
       - hostinger-api-mcp
     env:
       API_TOKEN: ${HOSTINGER_API_KEY}
