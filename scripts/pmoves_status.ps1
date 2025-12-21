@@ -6,10 +6,16 @@ $mode = if ($env:PMZ_INTERNAL_ONLY -eq '1') { 'internal-only' } elseif ($env:PMZ
 Write-Host "PMOVES-BotZ Status"
 Write-Host "- Namespace: $ns"
 Write-Host "- Port mode: $mode"
-Write-Host "- pmoves-net: $($env:PMOVES_AI_NETWORK ?? 'pmoves-net')"
+$netName = if ($env:PMOVES_AI_NETWORK) { $env:PMOVES_AI_NETWORK } else { 'pmoves-net' }
+Write-Host "- pmoves-net: $netName"
 
 function Get-HostPort([string]$svc, [string]$cport) {
-  $name = "$ns-$svc-1"
+  # Try explicit container name first
+  $name = "pmz-$svc"
+  if (!(docker ps -q -f name=^/${name}$)) {
+    # Fallback to compose default
+    $name = "$ns-$svc-1"
+  }
   try {
     $obj = docker inspect $name | ConvertFrom-Json
     $hp = $obj[0].NetworkSettings.Ports."$cport/tcp"[0].HostPort
@@ -21,9 +27,9 @@ function Get-HostPort([string]$svc, [string]$cport) {
 Write-Host "`nEndpoints (host):"
 $gw = $env:GATEWAY_PORT; if (-not $gw) { $gw = Get-HostPort 'mcp-gateway' '2091' }; Write-Host ("Gateway`.  http://localhost:{0}/ready" -f $gw)
 $dl = $env:DOCLING_PORT; if (-not $dl) { $dl = Get-HostPort 'docling-mcp' '3020' }; Write-Host ("Docling`. http://localhost:{0}/health" -f $dl)
-$cp = $env:CIPHER_API_PORT; if (-not $cp) { $cp = Get-HostPort 'cipher-memory' '3011' }; if ($cp) { Write-Host ("Cipher`.  http://localhost:{0}/health" -f $cp) }
+$cp = $env:CIPHER_API_PORT; if (-not $cp) { $cp = Get-HostPort 'cipher' '3011' }; if ($cp) { Write-Host ("Cipher`.  http://localhost:{0}/health" -f $cp) }
 
-Write-Host "`nEndpoints (pmoves-net DNS):"
+Write-Host "`nEndpoints (Internal DNS):"
 Write-Host "Gateway`.  http://mcp-gateway:2091"
 Write-Host "Docling`. http://docling-mcp:3020"
 Write-Host "Cipher`.  http://cipher-memory:3011"
