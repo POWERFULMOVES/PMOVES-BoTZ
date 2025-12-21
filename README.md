@@ -50,4 +50,5 @@ PMOVES-BoTZ is a unified multi-agent platform for document processing, memory ma
 
 ## Documentation
 
-See `docs/` for detailed documentation.
+- **[Architecture Guide](docs/ARCHITECTURE_BOTZ.md)**: Overview of the BoTZ directory structure, services, and networking.
+- **Legacy Reference**: See `docs/archive/PMOVES.AI_Reference/` for the upstream Enterprise Architecture.
