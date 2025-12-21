@@ -17,9 +17,9 @@ url = "http://host.docker.internal:1234/v1"
 # Primary: FunctionGemma 270m (Ollama)
 [functions.coding]
 type = "chat"
-system_prompt = "You are a coding assistant optimized for function calling and logic."
 
-[[functions.coding.variants]]
+
+[functions.coding.variants.primary]
 provider = "ollama"
 model = "functiongemma:270m"
 weight = 1.0
@@ -29,14 +29,14 @@ weight = 1.0
 # Fallback: Nemotron 3 Nano (Local)
 [functions.orchestrator]
 type = "chat"
-system_prompt = "You are the primary orchestrator for the PMOVES system."
 
-[[functions.orchestrator.variants]]
+
+[functions.orchestrator.variants.primary_cloud]
 provider = "huggingface" # Assuming cloud endpoint for Gemini/Nemotron-Cloud via HF or similar
 model = "gemini-3-flash-preview:cloud" 
 weight = 1.0
 
-[[functions.orchestrator.variants]]
+[functions.orchestrator.variants.fallback_local]
 provider = "ollama"
 model = "nemotron-3-nano:30b"
 weight = 0.0 # Manual fallback or secondary
@@ -46,13 +46,14 @@ weight = 0.0 # Manual fallback or secondary
 # Cloud: Qwen3 VL 235b Instruct (Cloud)
 [functions.vl_sentinel]
 type = "chat"
+system_prompt = "You are a Vision-Language Sentinel. Analyze images and provide structured descriptions."
 
-[[functions.vl_sentinel.variants]]
+[functions.vl_sentinel.variants.primary_local]
 provider = "ollama"
 model = "qwen3-vl:8b"
 weight = 1.0
 
-[[functions.vl_sentinel.variants]]
+[functions.vl_sentinel.variants.cloud_fallback]
 provider = "huggingface"
 model = "qwen3-vl:235b-instruct-cloud"
 weight = 0.0
@@ -62,7 +63,7 @@ weight = 0.0
 [functions.embed]
 type = "embedding"
 
-[[functions.embed.variants]]
+[functions.embed.variants.primary]
 provider = "ollama"
 model = "qwen3-embedding:8b"
 weight = 1.0
