@@ -102,6 +102,7 @@ services:
     build:
       context: ../../features/cipher
       dockerfile: Dockerfile.cipher
+    container_name: pmz-cipher
     stdin_open: true
     tty: true
     environment:
@@ -124,6 +125,7 @@ services:
     build:
       context: ../../features/n8n
       dockerfile: Dockerfile
+    container_name: pmz-n8n
     stdin_open: true
     tty: true
     environment:
@@ -150,7 +152,7 @@ services:
       context: ../../features/yt
       dockerfile: Dockerfile
     image: pmoves/yt-mini:dev
-    container_name: yt-mini
+    container_name: pmz-yt-mini
     environment:
       PMOVES_MODE: yt-mini
     restart: unless-stopped
@@ -163,6 +165,7 @@ services:
     build:
       context: ../../features/hostinger
       dockerfile: Dockerfile
+    container_name: pmz-hostinger
     stdin_open: true
     tty: true
     environment:
@@ -170,6 +173,23 @@ services:
       - HOSTINGER_API_KEY=${HOSTINGER_API_KEY}
     labels:
       pmoves.service: "hostinger"
+      pmoves.mcp: "true"
+    networks:
+      - pmoves_ai
+
+
+
+  # 11. Postman (API Testing) - Node runtime for MCP
+  postman:
+    image: node:20-slim
+    container_name: pmz-postman
+    working_dir: /app
+    command: tail -f /dev/null
+    init: true
+    stdin_open: true
+    tty: true
+    labels:
+      pmoves.service: "postman"
       pmoves.mcp: "true"
     networks:
       - pmoves_ai
