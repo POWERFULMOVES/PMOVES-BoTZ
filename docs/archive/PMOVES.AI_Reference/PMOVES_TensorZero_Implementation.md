@@ -26,7 +26,7 @@ Define abstract "Functions" (business logic) that map to specific "Models" and "
 
 ```toml
 [gateway]
-bind_address = "0.0.0.0:3000"
+bind_address = "0.0.0.0:3006"
 
 [functions.chat]
 type = "chat"
@@ -65,7 +65,7 @@ The Gateway exposes a standardized `/inference` endpoint.
 ```python
 from tensorzero import AsyncTensorZeroGateway
 
-async with await AsyncTensorZeroGateway.build_http(gateway_url="http://localhost:3000") as client:
+async with await AsyncTensorZeroGateway.build_http(gateway_url="http://localhost:3006") as client:
     result = await client.inference(
         function_name="agent_chat",
         input={
@@ -80,7 +80,7 @@ async with await AsyncTensorZeroGateway.build_http(gateway_url="http://localhost
 
 ### 3.2 HTTP/cURL Example
 ```bash
-curl -X POST http://localhost:3000/inference \
+curl -X POST http://localhost:3006/inference \
   -H "Content-Type: application/json" \
   -d '{
     "function_name": "agent_chat",

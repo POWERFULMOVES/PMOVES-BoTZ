@@ -151,9 +151,6 @@ class TestDockerHealthChecks:
 
     def test_health_check_command(self):
         """Test Docker health check command."""
-        # Expected health check command from Dockerfile
-        expected_command = 'curl -f -H "Accept: text/event-stream" http://localhost:3020/health'
-        
         repo_root = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
         dockerfile_path = os.path.join(repo_root, "features", "docling", "Dockerfile.docling-mcp")
         

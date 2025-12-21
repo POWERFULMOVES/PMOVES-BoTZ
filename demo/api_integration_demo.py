@@ -9,7 +9,6 @@ It adapts to the 5-Tier Network Architecture where only the Gateway and TensorZe
 import os
 import sys
 import json
-import time
 import requests
 from datetime import datetime
 

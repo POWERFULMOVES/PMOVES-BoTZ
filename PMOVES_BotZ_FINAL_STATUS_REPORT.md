@@ -66,7 +66,7 @@ environment:
 ```yaml
 # Fixed in docker-compose.mcp-pro.local-postman.yml
 environment:
-  POSTMAN_API_KEY: PMAK-690e5c6600414a0001f14674-3167c3686c5e852470b7a045287475b307
+  POSTMAN_API_KEY: ${POSTMAN_API_KEY}  # Set via .env file
   POSTMAN_API_BASE_URL: https://api.postman.com
 # Removed obsolete version: '3.8' attribute
 ```
