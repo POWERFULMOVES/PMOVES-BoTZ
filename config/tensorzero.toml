@@ -3,67 +3,36 @@ bind_address = "0.0.0.0:3000"
 
 [[providers.ollama]]
 type = "ollama"
-url = "http://host.docker.internal:11434"  # Default for Docker Desktop/local access
+url = "http://host.docker.internal:11434"
 
-[[providers.huggingface]]
-type = "huggingface"
-# API Token should be injected via environment variable TENSORZERO_PROVIDER_HUGGINGFACE_API_TOKEN
+[[providers.openrouter]]
+type = "openai"
+url = "https://openrouter.ai/api/v1"
+# API Key should be set in TENSORZERO_PROVIDER_OPENROUTER_API_KEY environment variable
 
-[[providers.lmstudio]]
-type = "openai"  # LMStudio usually exposes an OpenAI-compatible API
-url = "http://host.docker.internal:1234/v1"
-
-# --- Function: Coding / Logic ---
-# Primary: FunctionGemma 270m (Ollama)
-[functions.coding]
-type = "chat"
-
-
-[functions.coding.variants.primary]
-provider = "ollama"
-model = "functiongemma:270m"
-weight = 1.0
-
-# --- Function: Orchestrator / General Agent ---
-# Primary: Gemini 3 Flash Preview (Cloud - hypothetical provider mapping to OpenAI/Google)
-# Fallback: Nemotron 3 Nano (Local)
+# --- Function: Orchestrator (Main Chat) ---
 [functions.orchestrator]
 type = "chat"
 
-
 [functions.orchestrator.variants.primary_cloud]
-provider = "huggingface" # Assuming cloud endpoint for Gemini/Nemotron-Cloud via HF or similar
-model = "gemini-3-flash-preview:cloud" 
+provider = "openrouter"
+model = "nvidia/nemotron-4-340b-instruct"
 weight = 1.0
 
-[functions.orchestrator.variants.fallback_local]
-provider = "ollama"
-model = "nemotron-3-nano:30b"
-weight = 0.0 # Manual fallback or secondary
-
-# --- Function: Vision-Language Sentinel ---
-# Primary: Qwen3 VL 8b (Local)
-# Cloud: Qwen3 VL 235b Instruct (Cloud)
-[functions.vl_sentinel]
+# --- Function: Utility (Nemotron Nano) ---
+[functions.utility]
 type = "chat"
-system_prompt = "You are a Vision-Language Sentinel. Analyze images and provide structured descriptions."
 
-[functions.vl_sentinel.variants.primary_local]
+[functions.utility.variants.primary_local]
 provider = "ollama"
-model = "qwen3-vl:8b"
+model = "nemotron-mini"
 weight = 1.0
 
-[functions.vl_sentinel.variants.cloud_fallback]
-provider = "huggingface"
-model = "qwen3-vl:235b-instruct-cloud"
-weight = 0.0
-
-# --- Function: Embeddings ---
-# Primary: Qwen3 Embedding 8b (4096 dim)
+# --- Function: Embedding (Qwen 8b/7b) ---
 [functions.embed]
 type = "embedding"
 
 [functions.embed.variants.primary]
 provider = "ollama"
-model = "qwen3-embedding:8b"
+model = "qwen2.5:7b"
 weight = 1.0
