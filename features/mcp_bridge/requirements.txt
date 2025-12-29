@@ -1,0 +1,4 @@
+# PMOVES MCP Bridge dependencies
+httpx>=0.25.0
+nats-py>=2.6.0
+aiohttp>=3.9.0
