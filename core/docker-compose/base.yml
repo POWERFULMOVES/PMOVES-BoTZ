@@ -202,6 +202,23 @@ services:
       - pmoves_app
       - pmoves_data
 
+  # 10. Skills Library (Agent Skills Management)
+  skills:
+    build:
+      context: ../../features/skills
+      dockerfile: Dockerfile
+    container_name: pmz-skills
+    stdin_open: true
+    tty: true
+    volumes:
+      - ../../features/skills/library:/app/library:ro
+      - ../../features/skills/repos:/app/repos:ro
+    labels:
+      pmoves.service: "skills"
+      pmoves.mcp: "true"
+    networks:
+      - pmoves_app  # Internal tool access
+
   # 8. TensorZero (Gateway/Inference)
   tensorzero:
     container_name: pmz-tensorzero

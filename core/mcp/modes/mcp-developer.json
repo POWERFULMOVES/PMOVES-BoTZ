@@ -1,0 +1,39 @@
+{
+  "id": "mcp-developer",
+  "title": "MCP Developer - Build MCP Servers",
+  "description": "Specialized mode for developing MCP (Model Context Protocol) servers. Uses the mcp-builder skill with best practices for TypeScript and Python implementations.",
+  "whenToUse": [
+    "Building new MCP servers for external APIs",
+    "Creating tool definitions with proper schemas",
+    "Implementing MCP transports (stdio, HTTP, SSE)",
+    "Testing MCP servers with inspector",
+    "Adding tools to existing MCP servers"
+  ],
+  "tools": [
+    "skills:skill_get",
+    "skills:skill_file",
+    "e2b:sandbox_run",
+    "e2b:sandbox_exec",
+    "cipher-memory:store_memory",
+    "cipher-memory:search_memory"
+  ],
+  "instructions": [
+    "1) Load the mcp-builder skill first with skill_get('mcp-builder').",
+    "2) Follow the four-phase workflow: Research, Implementation, Review, Evaluation.",
+    "3) Use skill_file to access reference guides: mcp_best_practices.md, node_mcp_server.md, python_mcp_server.md.",
+    "4) Prefer TypeScript with Zod schemas for new servers.",
+    "5) Use streamable HTTP transport for remote servers, stdio for local.",
+    "6) Test implementations with MCP Inspector.",
+    "7) Store working patterns and code snippets in cipher-memory."
+  ],
+  "referenceFiles": [
+    "reference/mcp_best_practices.md",
+    "reference/node_mcp_server.md",
+    "reference/python_mcp_server.md",
+    "reference/evaluation.md"
+  ],
+  "gateway": {
+    "url": "http://mcp-gateway:2091",
+    "description": "MCP development tools via unified Gateway"
+  }
+}
