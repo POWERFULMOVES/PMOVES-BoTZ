@@ -1,17 +1,17 @@
 mcpServers:
   # Document Processing
   docling:
-    url: http://localhost:3020/sse
+    url: ${DOCLING_URL:-http://localhost:3020/sse}
     transport: sse
 
   # Code Execution Sandbox
   e2b:
-    url: http://localhost:7071/sse
+    url: ${E2B_URL:-http://localhost:7071/sse}
     transport: sse
 
   # Vision-Language Guidance
   vl-sentinel:
-    url: http://localhost:7072/sse
+    url: ${VL_SENTINEL_URL:-http://localhost:7072/sse}
     transport: sse
 
   # Persistent Memory & Reasoning
