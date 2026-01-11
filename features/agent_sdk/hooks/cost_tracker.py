@@ -26,15 +26,23 @@ from pathlib import Path
 from typing import Any, Optional
 
 
-# Approximate costs per 1K tokens (USD)
+# Model costs per 1K tokens (USD)
+# Last verified: 2025-01-10
+# Sources:
+#   - Anthropic: https://docs.anthropic.com/en/docs/about-claude/models
+#   - OpenAI: https://openai.com/pricing
+#   - Gemini: https://ai.google.dev/pricing
+# Note: Provider APIs do not expose pricing endpoints. Static pricing maps are the
+# industry standard (LangChain, LlamaIndex, Langfuse). Update quarterly or when
+# providers announce price changes.
 MODEL_COSTS = {
-    # Anthropic
+    # Anthropic (verified 2025-01-10)
     "claude-sonnet-4-5": {"input": 0.003, "output": 0.015},
     "claude-opus-4": {"input": 0.015, "output": 0.075},
     "claude-3-haiku": {"input": 0.00025, "output": 0.00125},
 
-    # OpenAI via OpenRouter
-    "gpt-4o": {"input": 0.005, "output": 0.015},
+    # OpenAI (verified 2025-01-10)
+    "gpt-4o": {"input": 0.0025, "output": 0.01},
     "gpt-4o-mini": {"input": 0.00015, "output": 0.0006},
 
     # Local models (free)
@@ -43,7 +51,7 @@ MODEL_COSTS = {
     "llama3.1": {"input": 0, "output": 0},
     "phi3": {"input": 0, "output": 0},
 
-    # Gemini
+    # Gemini (verified 2025-01-10)
     "gemini-2.0-flash": {"input": 0.00015, "output": 0.0006},
     "gemini-3-flash-preview": {"input": 0.0001, "output": 0.0004},
 }

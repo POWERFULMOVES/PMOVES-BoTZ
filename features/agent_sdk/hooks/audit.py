@@ -113,17 +113,74 @@ class AuditHook:
         return {}
 
     def _summarize_input(self, input_data: dict) -> dict:
-        """Create a safe summary of input data (no secrets)."""
-        summary = {}
-        for key, value in input_data.items():
-            # Redact sensitive fields
-            if any(s in key.lower() for s in ["password", "secret", "token", "key", "credential"]):
-                summary[key] = "[REDACTED]"
-            elif isinstance(value, str) and len(value) > 200:
-                summary[key] = f"{value[:100]}... [{len(value)} chars]"
-            else:
-                summary[key] = value
-        return summary
+        """
+        Create a safe summary of input data (no secrets).
+
+        Redacts sensitive fields recursively through nested structures.
+        """
+        # Sensitive key patterns to redact
+        SENSITIVE_PATTERNS = [
+            "password", "passwd", "pwd",
+            "secret", "shared_secret",
+            "token", "access_token", "refresh_token", "auth_token", "api_token",
+            "key", "api_key", "apikey", "api_key", "private_key", "secret_key",
+            "credential", "credentials",
+            "authorization", "auth",
+            "bearer",
+        ]
+
+        def _redact_value(value: Any) -> Any:
+            """Recursively redact sensitive data from value."""
+            if isinstance(value, dict):
+                return _redact_dict(value)
+            elif isinstance(value, list):
+                return [_redact_item(item) for item in value]
+            elif isinstance(value, str):
+                # Redact strings that look like JWTs or API keys
+                if len(value) > 30 and (
+                    value.startswith("ey") or  # JWT
+                    value.startswith("sk-") or  # OpenAI-style keys
+                    value.startswith("xoxb") or  # Slack
+                    len(value.split("-")) == 5  # UUID-like
+                ):
+                    return "[REDACTED_POSSIBLE_CREDENTIAL]"
+                return value
+            return value
+
+        def _redact_item(item: Any) -> Any:
+            """Redact a single item (could be dict, list, or primitive)."""
+            if isinstance(item, dict):
+                return _redact_dict(item)
+            elif isinstance(item, list):
+                return [_redact_item(i) for i in item]
+            return item
+
+        def _redact_dict(d: dict) -> dict:
+            """Recursively redact sensitive keys in a dictionary."""
+            result = {}
+            for key, value in d.items():
+                # Check if key matches any sensitive pattern
+                key_lower = key.lower().replace("_", "").replace("-", "")
+                is_sensitive = any(
+                    pattern.replace("_", "").replace("-", "") in key_lower
+                    for pattern in SENSITIVE_PATTERNS
+                )
+
+                if is_sensitive:
+                    result[key] = "[REDACTED]"
+                elif isinstance(value, (dict, list)):
+                    result[key] = _redact_value(value)
+                elif isinstance(value, str) and len(value) > 200:
+                    result[key] = f"{value[:100]}... [{len(value)} chars]"
+                else:
+                    result[key] = value
+            return result
+
+        # Handle if input_data is not a dict
+        if not isinstance(input_data, dict):
+            return {"value": _redact_value(input_data)}
+
+        return _redact_dict(input_data)
 
     def _is_error(self, result: Any) -> bool:
         """Check if result indicates an error."""
