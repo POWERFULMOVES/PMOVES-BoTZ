@@ -117,7 +117,30 @@ PMOVES-BoTZ ships a `vl-sentinel` service that defaults to **Ollama** as the vis
 For this repo’s **local-first** profile:
 
 - BoTZ + VL-Sentinel assume **Ollama is running on the AMD host with the RTX 5090**, serving `qwen2.5-vl:14b` or a compatible VL model.  
-- Cloud VL (e.g., `gpt-4o-mini` via `VL_PROVIDER=openai`) remains optional and should be layered in only after the Ollama path is healthy and validated via `scripts/smoke_tests.py` and the `/health` endpoint on `vl-sentinel`.
+## Recommended Models (Q3 2025 Preview / "Qwen3" Series)
+
+| Service | Model Name | Source | Context | Notes |
+| :--- | :--- | :--- | :--- | :--- |
+| **Orchestrator** | `gemini-3-flash-preview:cloud` | Cloud | 2M+ | High-speed reasoning |
+| **Orchestrator (Fallback)** | `nemotron-3-nano:30b` | Ollama | 128k | Efficient local reasoning |
+| **Coding / Function** | `functiongemma:270m` | Ollama | 8k | Extremely fast function calling |
+| **VL Sentinel** | `qwen3-vl:8b` | Ollama | 32k | Local visual analysis |
+| **VL Sentinel (Cloud)** | `qwen3-vl:235b-instruct-cloud` | Cloud | 128k | Deep visual understanding |
+| **Embeddings** | `qwen3-embedding:8b` | Ollama | 8k | 4096 dimensions |
+
+### Legacy / Stable Recommendations
+*(Previous recommendations below)*
+
+## Recommended Models (Q3 2025 Preview / "Qwen3" Series)
+
+| Service | Model Name | Source | Context | Notes |
+| :--- | :--- | :--- | :--- | :--- |
+| **Orchestrator** | `gemini-3-flash-preview:cloud` | Cloud | 2M+ | High-speed reasoning |
+| **Orchestrator** | `nemotron-3-nano:30b` | Ollama | 128k | efficient local reasoning |
+| **Coding / Function** | `functiongemma:270m` | Ollama | 8k | Extremely fast function calling |
+| **VL Sentinel** | `qwen3-vl:8b` | Ollama | 32k | Local visual analysis |
+| **VL Sentinel (Cloud)** | `qwen3-vl:235b-instruct-cloud` | Cloud | 128k | Deep visual understanding |
+| **Embeddings** | `qwen3-embedding:8b` | Ollama | 8k | 4096 dimensions |
 
 ## Summary Table - Models by Service and Hardware
 

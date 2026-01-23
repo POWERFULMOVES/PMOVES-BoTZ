@@ -1,0 +1,144 @@
+# PMOVES-BoTZ Security Constitution
+# Implements "Defense in Depth" as per BoTZ doctrine
+# Reference: docs/agents/Aligning AI Agents with Indy Dev Dan.md
+
+global_protection:
+  # BLOCKING RULES: Commands that are strictly forbidden
+  blocked_commands:
+    - pattern: "rm -rf /"
+      reason: "Catastrophic system destruction risk. BLOCKED."
+    - pattern: "rm -rf /*"
+      reason: "Catastrophic system destruction risk. BLOCKED."
+    - pattern: "rm -rf ~"
+      reason: "Home directory destruction risk. BLOCKED."
+    - pattern: "git push --force"
+      reason: "History rewriting is forbidden for agents. Ask a human."
+    - pattern: "git push -f"
+      reason: "History rewriting is forbidden for agents. Ask a human."
+    - pattern: "drop database"
+      reason: "Database destruction requires human approval."
+    - pattern: "DROP DATABASE"
+      reason: "Database destruction requires human approval."
+    - pattern: "DROP TABLE"
+      reason: "Table destruction requires human approval."
+    - pattern: "chmod 777"
+      reason: "Insecure permission setting. Use minimal permissions."
+    - pattern: "curl | sh"
+      reason: "Piping remote scripts is a security risk."
+    - pattern: "curl | bash"
+      reason: "Piping remote scripts is a security risk."
+    - pattern: "> /dev/sda"
+      reason: "Direct disk write is forbidden."
+    - pattern: "mkfs"
+      reason: "Filesystem formatting is forbidden."
+    - pattern: ":(){ :|:& };:"
+      reason: "Fork bomb detected. BLOCKED."
+
+  # PATH PROTECTION: Granular file access control
+  protected_paths:
+    # Zero Access - Agent cannot read or write (secrets hidden)
+    - path: ".env"
+      level: "zero_access"
+      reason: "Environment secrets must remain hidden from agents."
+    - path: ".env.*"
+      level: "zero_access"
+      reason: "Environment secrets must remain hidden from agents."
+    - path: "**/*.pem"
+      level: "zero_access"
+      reason: "Private keys must remain hidden."
+    - path: "**/*.key"
+      level: "zero_access"
+      reason: "Private keys must remain hidden."
+    - path: "**/credentials.json"
+      level: "zero_access"
+      reason: "Credential files must remain hidden."
+    - path: "**/secrets/**"
+      level: "zero_access"
+      reason: "Secrets directory is off-limits."
+
+    # Read-Only - Agent can read but not modify
+    - path: ".git/"
+      level: "read_only"
+      reason: "Git internals should not be directly manipulated."
+    - path: "security/patterns.yaml"
+      level: "read_only"
+      reason: "Agent cannot disable its own security."
+    - path: ".github/workflows/**"
+      level: "read_only"
+      reason: "CI/CD workflows require human review."
+
+    # No Delete - Agent can modify but not delete
+    - path: "core/**"
+      level: "no_delete"
+      reason: "Core infrastructure files cannot be deleted."
+    - path: "features/**"
+      level: "no_delete"
+      reason: "Feature modules cannot be deleted without approval."
+    - path: "docs/**"
+      level: "no_delete"
+      reason: "Documentation cannot be deleted."
+
+# HOOK CONFIGURATION
+hooks:
+  pre_execution:
+    - name: "Pattern Match Safety Check"
+      type: "deterministic"
+      description: "Regex-based blocking of dangerous commands"
+      action_on_match: "block"
+
+    - name: "Probabilistic Safety Check"
+      type: "llm_eval"
+      model: "claude-3-haiku-20240307"
+      prompt: |
+        Analyze the following shell command: '{command}'
+        Context: This command is running in the PMOVES-BoTZ production environment.
+
+        Risk Assessment Criteria:
+        1. Does this command risk data loss?
+        2. Could this expose secrets or credentials?
+        3. Could this cause system instability?
+        4. Does this modify critical infrastructure?
+        5. Does this have irreversible effects?
+
+        Answer strictly with one word: SAFE or RISKY
+        If RISKY, briefly explain why on the next line.
+      trigger_on: "shell_command"
+      action_on_risk: "ask_user"
+
+  post_execution:
+    - name: "Audit Logger"
+      type: "log"
+      description: "Log all agent actions for audit trail"
+      log_path: "memory/audit/agent_actions.log"
+      format: "{timestamp} | {agent} | {action} | {status}"
+
+# AGENT PERMISSIONS BY ROLE
+agent_permissions:
+  architect:
+    description: "High-level planning agent (Opus 4.5)"
+    can_execute: false
+    can_plan: true
+    can_read: ["**/*"]
+    can_write: ["memory/plans/**", "docs/**"]
+
+  builder:
+    description: "Code execution agent (Sonnet)"
+    can_execute: true
+    can_plan: false
+    can_read: ["**/*"]
+    can_write: ["src/**", "features/**", "tests/**"]
+    blocked_paths: [".env", "security/**"]
+
+  auditor:
+    description: "Security review agent (Haiku)"
+    can_execute: false
+    can_plan: false
+    can_read: ["**/*"]
+    can_write: ["memory/audit/**", "memory/expertise/**"]
+
+  researcher:
+    description: "Information gathering agent"
+    can_execute: false
+    can_plan: false
+    can_read: ["**/*"]
+    can_write: ["memory/research/**"]

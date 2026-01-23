@@ -1,5 +1,6 @@
 # Start PMOVES-BoTZ
 $env:PMZ_NAMESPACE = "pmoves-botz"
+$env:COMPOSE_PROJECT_NAME = "pmoves-botz"
 docker-compose -f core/docker-compose/base.yml -f core/docker-compose/overlays/development.yml up -d
 Write-Host "PMOVES-BoTZ started."
 Write-Host "Gateway: http://localhost:2091"

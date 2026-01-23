@@ -18,10 +18,11 @@ services:
       - NET_RAW
     restart: unless-stopped
     networks:
-      - pmoves_ai
+      - pmoves_api  # Needs external access
 
   # 2. MCP Gateway (Orchestrator)
   mcp-gateway:
+    container_name: pmz-mcp-gateway
     image: python:3.11-slim
     working_dir: /app
     volumes:
@@ -33,7 +34,9 @@ services:
     environment:
       - PORT=2091
     networks:
-      - pmoves_ai
+      - pmoves_api  # Entrypoint
+      - pmoves_app  # Talk to agents
+      - pmoves_data # Talk to Cipher
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:2091/health')"]
       interval: 30s
@@ -42,6 +45,7 @@ services:
 
   # 3. Docling MCP (Document Processing)
   docling-mcp:
+    container_name: pmz-docling-mcp
     build:
       context: ../../features/docling
       dockerfile: Dockerfile.docling-mcp
@@ -49,7 +53,7 @@ services:
     environment:
       - PORT=3020
     networks:
-      - pmoves_ai
+      - pmoves_app # Internal tool
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:3020/health"]
       interval: 30s
@@ -58,6 +62,7 @@ services:
 
   # 4. E2B Runner (Sandbox Layer)
   e2b-runner:
+    container_name: pmz-e2b-runner
     build:
       context: ../../features/e2b
       dockerfile: Dockerfile
@@ -69,7 +74,7 @@ services:
       - PORT=7071
       - E2B_API_KEY=${E2B_API_KEY}
     networks:
-      - pmoves_ai
+      - pmoves_api # Needs internet for sandbox
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:7071/health')"]
       interval: 30s
@@ -78,6 +83,7 @@ services:
 
   # 5. VL Sentinel (Vision-Language Layer)
   vl-sentinel:
+    container_name: pmz-vl-sentinel
     build:
       context: ../../features/vl_sentinel
       dockerfile: Dockerfile
@@ -90,7 +96,7 @@ services:
       VL_PROVIDER: ${VL_PROVIDER:-ollama}
       PORT: "7072"
     networks:
-      - pmoves_ai
+      - pmoves_app # Internal model service
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:7072/health')"]
       timeout: 10s
@@ -102,6 +108,7 @@ services:
     build:
       context: ../../features/cipher
       dockerfile: Dockerfile.cipher
+    container_name: pmz-cipher
     stdin_open: true
     tty: true
     environment:
@@ -117,13 +124,14 @@ services:
     networks:
       default:
         aliases: ["pmoves-botz_cipher", "cipher-memory"]
-      pmoves_ai: {}
+      pmoves_data: {} # Strict Isolation
 
   # 7. n8n Agent (Workflow Automation Layer)
   n8n-agent:
     build:
       context: ../../features/n8n
       dockerfile: Dockerfile
+    container_name: pmz-n8n
     stdin_open: true
     tty: true
     environment:
@@ -131,7 +139,7 @@ services:
       - N8N_API_KEY=${N8N_API_KEY}
       - CIPHER_MEMORY_PATH=/app/features/cipher/pmoves_cipher
       # TensorZero integration for local LLM inference
-      - TENSORZERO_BASE_URL=${TENSORZERO_BASE_URL:-http://tensorzero-gateway:3030}
+      - TENSORZERO_BASE_URL=${TENSORZERO_BASE_URL:-http://tensorzero:3000}
       - TENSORZERO_MODEL=${TENSORZERO_MODEL:-qwen2_5_14b}
       - TENSORZERO_API_KEY=${TENSORZERO_API_KEY:-}
     volumes:
@@ -142,7 +150,9 @@ services:
       pmoves.service: "n8n-agent"
       pmoves.mcp: "true"
     networks:
-      - pmoves_ai
+      - pmoves_api # Internet for nodes
+      - pmoves_app # Talk to TensorZero
+      - pmoves_data # Talk to Cipher
 
   # 8. YT Mini Agent (YouTube/Media Layer)
   yt-mini:
@@ -150,19 +160,20 @@ services:
       context: ../../features/yt
       dockerfile: Dockerfile
     image: pmoves/yt-mini:dev
-    container_name: yt-mini
+    container_name: pmz-yt-mini
     environment:
       PMOVES_MODE: yt-mini
     restart: unless-stopped
     command: tail -f /dev/null
     networks:
-      - pmoves_ai
+      - pmoves_api # Needs internet for YouTube
 
   # 9. Hostinger Agent (VPS/DNS/Domain Management)
   hostinger:
     build:
       context: ../../features/hostinger
       dockerfile: Dockerfile
+    container_name: pmz-hostinger
     stdin_open: true
     tty: true
     environment:
@@ -172,13 +183,65 @@ services:
       pmoves.service: "hostinger"
       pmoves.mcp: "true"
     networks:
-      - pmoves_ai
+      - pmoves_api # Needs internet for Hostinger API
+
+  # 11. Postman (API Testing) - Node runtime for MCP
+  postman:
+    image: node:20-slim
+    container_name: pmz-postman
+    working_dir: /app
+    command: tail -f /dev/null
+    init: true
+    stdin_open: true
+    tty: true
+    labels:
+      pmoves.service: "postman"
+      pmoves.mcp: "true"
+    networks:
+      - pmoves_api # Needs internet for API tests
+      - pmoves_app
+      - pmoves_data
+
+  # 8. TensorZero (Gateway/Inference)
+  tensorzero:
+    container_name: pmz-tensorzero
+    image: tensorzero/gateway:latest
+    environment:
+      - PORT=3000
+    ports:
+      - "${TENSORZERO_PORT:-3006}:3000"
+    volumes:
+      - ../../config/tensorzero.toml:/app/config.toml
+    command: --config-file /app/config.toml
+    networks:
+      - pmoves_api # Exposed port
+      - pmoves_app # Internal agent access
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: unless-stopped
 
 volumes:
   cipher_data:
   ts-state:
 
 networks:
-  pmoves_ai:
-    name: pmoves_ai
+  pmoves_api:
+    driver: bridge
+
+  pmoves_app:
+    driver: bridge
+    internal: true # No external internet access
+
+  pmoves_bus:
+    driver: bridge
+    internal: true
+
+  pmoves_data:
+    driver: bridge
+    internal: true
+
+  pmoves_monitoring:
     driver: bridge

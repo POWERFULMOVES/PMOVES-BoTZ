@@ -11,6 +11,7 @@ from unittest.mock import patch
 
 # Add parent directory to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent))
+sys.path.insert(0, str(Path(__file__).parent.parent / "features" / "docling"))
 
 from config import load_config
 from config.schema import Config, validate_config, LogLevel
