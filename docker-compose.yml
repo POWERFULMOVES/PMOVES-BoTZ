@@ -1,0 +1,267 @@
+# PMOVES-BoTZ Hybrid Standalone Mode Docker Compose
+# Run BoTZ independently while optionally connecting to PMOVES.AI services
+#
+# Usage:
+#   docker compose up -d                              # Fully standalone
+#   export TENSORZERO_URL=http://host.docker.internal:3030
+#   docker compose up -d                              # Hybrid mode (with parent TensorZero)
+#
+# Profiles:
+#   --profile cipher     - Enable Cipher Memory service
+#   --profile e2b        - Enable E2B sandbox
+#   --profile ollama     - Enable local Ollama LLM
+#   --profile tools      - Enable docling, metrics tools
+#   --profile all        - Enable all services
+
+version: "3.9"
+
+x-env-files: &env-files
+  env_file:
+    - path: .env
+      required: false
+
+x-common-env: &common-env
+  # Mode Detection
+  DOCKED_MODE: ${DOCKED_MODE:-false}
+  PARENT_SYSTEM: ${PARENT_SYSTEM:-PMOVES.AI}
+
+services:
+  # ============================================================================
+  # CORE MCP GATEWAY
+  # ============================================================================
+  python-gateway:
+    build:
+      context: ./features/gateway/python-gateway
+      dockerfile: Dockerfile
+    container_name: pmoves-botz-gateway
+    restart: unless-stopped
+    <<: *env-files
+    environment:
+      <<: *common-env
+      PORT: 2091
+      HOST: 0.0.0.0
+      # TensorZero Integration (for LLM-based workflows)
+      TENSORZERO_URL: ${TENSORZERO_URL:-http://host.docker.internal:3030}
+      TENSORZERO_API_KEY: ${TENSORZERO_API_KEY:-}
+      TENSORZERO_CHAT_MODEL: ${TENSORZERO_CHAT_MODEL:-qwen2_5_14b}
+      TENSORZERO_EMBED_MODEL: ${TENSORZERO_EMBED_MODEL:-text-embedding-3-small}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    ports:
+      - "${GATEWAY_PORT:-2091}:2091"
+    networks:
+      - pmoves_app
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:2091/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  mcp-bridge:
+    build:
+      context: ./features/mcp_bridge
+      dockerfile: Dockerfile
+    container_name: pmoves-botz-mcp-bridge
+    restart: unless-stopped
+    <<: *env-files
+    environment:
+      <<: *common-env
+      PORT: 8100
+      HOST: 0.0.0.0
+      # PMOVES.AI Service URLs (hybrid mode defaults)
+      TENSORZERO_URL: ${TENSORZERO_URL:-http://host.docker.internal:3030}
+      HIRAG_URL: ${HIRAG_URL:-http://host.docker.internal:8086}
+      SUPASERCH_URL: ${SUPASERCH_URL:-http://host.docker.internal:8099}
+      NATS_URL: ${NATS_URL:-nats://host.docker.internal:4222}
+      SUPABASE_URL: ${SUPABASE_URL:-http://host.docker.internal:3010}
+      SUPABASE_ANON_KEY: ${SUPABASE_ANON_KEY:-}
+      SUPABASE_SERVICE_KEY: ${SUPABASE_SERVICE_KEY:-}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    ports:
+      - "${MCP_BRIDGE_PORT:-8100}:8100"
+    networks:
+      - pmoves_app
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:8100/healthz"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  # ============================================================================
+  # DOCUMENT PROCESSING
+  # ============================================================================
+  docling-mcp:
+    build:
+      context: ./features/docling
+      dockerfile: Dockerfile.docling-mcp
+    container_name: pmoves-botz-docling
+    restart: unless-stopped
+    <<: *env-files
+    environment:
+      <<: *common-env
+      PORT: 3020
+      HOST: 0.0.0.0
+      DOCLING_VLM_REPO: ${DOCLING_VLM_REPO:-}
+      HF_API_KEY: ${HF_API_KEY:-}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    ports:
+      - "${DOCLING_PORT:-3020}:3020"
+    networks:
+      - pmoves_app
+    profiles:
+      - tools
+
+  # ============================================================================
+  # CODE EXECUTION
+  # ============================================================================
+  e2b-runner:
+    build:
+      context: ./features/e2b
+      dockerfile: Dockerfile
+    container_name: pmoves-botz-e2b
+    restart: unless-stopped
+    <<: *env-files
+    environment:
+      <<: *common-env
+      PORT: 7071
+      HOST: 0.0.0.0
+      E2B_API_KEY: ${E2B_API_KEY:-}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    ports:
+      - "${E2B_PORT:-7071}:7071"
+    networks:
+      - pmoves_app
+    profiles:
+      - e2b
+
+  # ============================================================================
+  # MEMORY & REASONING
+  # ============================================================================
+  cipher-memory:
+    build:
+      context: ./features/cipher/pmoves_cipher
+      dockerfile: Dockerfile
+    container_name: pmoves-botz-cipher
+    restart: unless-stopped
+    <<: *env-files
+    environment:
+      <<: *common-env
+      PORT: 8081
+      HOST: 0.0.0.0
+      # TensorZero for LLM-based memory operations
+      TENSORZERO_URL: ${TENSORZERO_URL:-http://host.docker.internal:3030}
+      TENSORZERO_API_KEY: ${TENSORZERO_API_KEY:-}
+      VENICE_API_KEY: ${VENICE_API_KEY:-}
+      # Database for persistent memory
+      CIPHER_DB_PATH: /data/cipher.db
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - cipher-data:/data
+    ports:
+      - "${CIPHER_PORT:-8081}:8081"
+    networks:
+      - pmoves_app
+    profiles:
+      - cipher
+
+  # ============================================================================
+  # VISION-LANGUAGE
+  # ============================================================================
+  vl-sentinel:
+    build:
+      context: ./features/vl_sentinel
+      dockerfile: Dockerfile
+    container_name: pmoves-botz-vl
+    restart: unless-stopped
+    <<: *env-files
+    environment:
+      <<: *common-env
+      PORT: 7072
+      HOST: 0.0.0.0
+      # Ollama for local VLM (can use parent or local)
+      OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://host.docker.internal:11434}
+      VL_PROVIDER: ${VL_PROVIDER:-ollama}
+      VL_MODEL: ${VL_MODEL:-llava}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    ports:
+      - "${VL_PORT:-7072}:7072"
+    networks:
+      - pmoves_app
+    profiles:
+      - tools
+    depends_on:
+      ollama:
+        condition: service_healthy
+        required: false
+
+  # ============================================================================
+  # LOCAL LLM (Optional - for standalone mode)
+  # ============================================================================
+  ollama:
+    image: ollama/ollama:latest
+    container_name: pmoves-botz-ollama
+    restart: unless-stopped
+    <<: *env-files
+    environment:
+      <<: *common-env
+      OLLAMA_HOST: 0.0.0.0
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - ollama-data:/root/.ollama
+    ports:
+      - "${OLLAMA_PORT:-11434}:11434"
+    networks:
+      - pmoves_app
+    profiles:
+      - ollama
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:11434/api/tags"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+
+  # ============================================================================
+  # METRICS & MONITORING
+  # ============================================================================
+  metrics-collector:
+    build:
+      context: ./features/metrics
+      dockerfile: Dockerfile
+    container_name: pmoves-botz-metrics
+    restart: unless-stopped
+    <<: *env-files
+    environment:
+      <<: *common-env
+      PORT: 9091
+      HOST: 0.0.0.0
+      PROMETHEUS_PUSHGATEWAY: ${PROMETHEUS_PUSHGATEWAY:-http://host.docker.internal:9091}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    ports:
+      - "${METRICS_PORT:-9091}:9091"
+    networks:
+      - pmoves_app
+    profiles:
+      - tools
+
+networks:
+  pmoves_app:
+    external: true
+    name: pmoves_pmoves_app
+    # If external network doesn't exist, create it first:
+    # docker network create pmoves_pmoves_app --driver bridge
+
+volumes:
+  cipher-data:
+    driver: local
+  ollama-data:
+    driver: local

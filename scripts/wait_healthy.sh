@@ -69,7 +69,7 @@ while true; do
 
         if check_service "$name" "$port" "$path"; then
             service_status[$name]="healthy"
-            ((healthy_count++))
+            healthy_count=$((healthy_count + 1))
         else
             service_status[$name]="unhealthy"
         fi

@@ -1,0 +1,38 @@
+[gateway]
+bind_address = "0.0.0.0:3000"
+
+[[providers.ollama]]
+type = "ollama"
+url = "http://host.docker.internal:11434"
+
+[[providers.openrouter]]
+type = "openai"
+url = "https://openrouter.ai/api/v1"
+# API Key should be set in TENSORZERO_PROVIDER_OPENROUTER_API_KEY environment variable
+
+# --- Function: Orchestrator (Main Chat) ---
+[functions.orchestrator]
+type = "chat"
+
+[functions.orchestrator.variants.primary_cloud]
+provider = "openrouter"
+model = "nvidia/nemotron-4-340b-instruct"
+weight = 1.0
+
+# --- Function: Utility (Nemotron Nano) ---
+[functions.utility]
+type = "chat"
+
+[functions.utility.variants.primary_local]
+provider = "ollama"
+model = "nemotron-mini"
+weight = 1.0
+
+# --- Function: Embedding (Qwen 8b/7b) ---
+[functions.embed]
+type = "embedding"
+
+[functions.embed.variants.primary]
+provider = "ollama"
+model = "qwen2.5:7b"
+weight = 1.0

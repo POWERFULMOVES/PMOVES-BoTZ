@@ -1,0 +1,47 @@
+# PMOVES-BoTZ Code Patterns
+# Dynamic expertise file - agents update this with learned patterns
+
+version: "1.0.0"
+last_updated: "2026-01-23"
+
+# Project-specific patterns learned by agents
+patterns:
+  typescript:
+    style: "functional with strict typing"
+    imports: "use absolute paths from src/"
+    exports: "prefer named exports"
+    async: "use async/await, avoid .then chains"
+
+  python:
+    style: "type-hinted, PEP 8 compliant"
+    imports: "group stdlib, third-party, local"
+    async: "use asyncio patterns"
+    testing: "pytest with fixtures"
+
+  docker:
+    base_images: "prefer alpine variants"
+    compose: "use profiles for optional services"
+    volumes: "named volumes over bind mounts for data"
+
+# Common fixes learned from past issues
+fixes:
+  - id: "fix-001"
+    issue: "pnpm install fails in CI"
+    solution: "Use --no-frozen-lockfile flag"
+    context: "CI environments may have different lock file versions"
+
+  - id: "fix-002"
+    issue: "Docker compose config validation"
+    solution: "Run 'docker compose config' to validate before deploy"
+    context: "Catches YAML syntax errors early"
+
+# Anti-patterns to avoid
+anti_patterns:
+  - pattern: "console.log for debugging in production code"
+    reason: "Use structured logging instead"
+
+  - pattern: "Hardcoded credentials"
+    reason: "Use environment variables via .env"
+
+  - pattern: "Synchronous file operations in async code"
+    reason: "Blocks event loop, use async variants"

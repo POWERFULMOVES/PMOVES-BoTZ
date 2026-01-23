@@ -6,6 +6,11 @@ on:
   pull_request:
     branches: [main]
 
+# Security: Explicit permissions following BoTZ "Defense in Depth" doctrine
+# Minimal permissions prevent GITHUB_TOKEN abuse if workflow is compromised
+permissions:
+  contents: read
+
 env:
   # CI-safe defaults (tests skip live API calls without real keys)
   VENICE_API_KEY: ${{ secrets.VENICE_API_KEY || 'ci_placeholder' }}

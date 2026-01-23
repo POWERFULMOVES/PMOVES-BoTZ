@@ -20,6 +20,7 @@ import pytest
 
 # Add the parent directory to the path
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(__file__)), "features", "docling"))
 
 from docling_mcp_server import DoclingMCPServer, run_stdio_server
 

@@ -22,6 +22,7 @@ from aiohttp.test_utils import AioHTTPTestCase, unittest_run_loop
 import sys
 import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(__file__)), "features", "docling"))
 
 from docling_mcp_server import DoclingMCPServer, run_http_server, create_custom_sse_handler
 

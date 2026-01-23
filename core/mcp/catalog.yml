@@ -1,17 +1,25 @@
 mcpServers:
   # Document Processing
+  # Authentication: Uses SUPABASE_JWT_SECRET for Bearer token validation
+  # Header: Authorization: Bearer <jwt_token>
+  # Or query param: ?token=<jwt_token>
+  # See: features/mcp_bridge/auth.py for validation logic
   docling:
-    url: http://localhost:3020/sse
+    url: ${DOCLING_URL:-http://localhost:3020/sse}
     transport: sse
 
   # Code Execution Sandbox
+  # Authentication: Uses SUPABASE_JWT_SECRET for Bearer token validation
+  # Note: E2B_API_KEY is for external E2B API calls, not MCP authentication
   e2b:
-    url: http://localhost:7071/sse
+    url: ${E2B_URL:-http://localhost:7071/sse}
     transport: sse
 
   # Vision-Language Guidance
+  # Authentication: Uses SUPABASE_JWT_SECRET for Bearer token validation
+  # Note: OPENAI_API_KEY is for OpenAI API calls, not MCP authentication
   vl-sentinel:
-    url: http://localhost:7072/sse
+    url: ${VL_SENTINEL_URL:-http://localhost:7072/sse}
     transport: sse
 
   # Persistent Memory & Reasoning
@@ -20,7 +28,7 @@ mcpServers:
     args:
       - exec
       - -i
-      - pmoves-botz_cipher
+      - pmz-cipher
       - python3
       - memory_shim/app_cipher_memory.py
     env:
@@ -32,7 +40,7 @@ mcpServers:
     args:
       - exec
       - -i
-      - pmoves-botz_postman-mcp-local
+      - pmz-postman
       - npx
       - "@postman/postman-mcp-server@latest"
       - "--full"
@@ -45,13 +53,13 @@ mcpServers:
     args:
       - exec
       - -i
-      - docker-compose-n8n-agent-1
+      - pmz-n8n
       - python
       - app_n8n_agent.py
     env:
       N8N_API_KEY: ${N8N_API_KEY}
       N8N_API_URL: ${N8N_API_URL:-http://n8n:5678/api/v1}
-      TENSORZERO_BASE_URL: ${TENSORZERO_BASE_URL:-http://tensorzero-gateway:3030}
+      TENSORZERO_BASE_URL: ${TENSORZERO_BASE_URL:-http://tensorzero:3000}
 
   # Hostinger VPS/DNS/Domain Management
   hostinger:
@@ -59,7 +67,7 @@ mcpServers:
     args:
       - exec
       - -i
-      - docker-compose-hostinger-1
+      - pmz-hostinger
       - hostinger-api-mcp
     env:
       API_TOKEN: ${HOSTINGER_API_KEY}

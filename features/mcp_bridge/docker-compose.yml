@@ -1,0 +1,39 @@
+# PMOVES MCP Bridge - Docker Compose Configuration
+# Exposes PMOVES.AI infrastructure services as MCP tools
+#
+# Usage:
+#   docker compose -f features/mcp_bridge/docker-compose.yml up -d
+#
+# Or with gateway:
+#   docker compose -f features/gateway/docker-compose.yml -f features/mcp_bridge/docker-compose.yml up -d
+
+services:
+  mcp-bridge:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: pmoves-mcp-bridge
+    ports:
+      - "8100:8100"
+    environment:
+      - PORT=8100
+      - HOST=0.0.0.0
+      - TENSORZERO_URL=${TENSORZERO_URL:-http://tensorzero:3030}
+      - HIRAG_URL=${HIRAG_URL:-http://hi-rag-gateway-v2:8086}
+      - NATS_URL=${NATS_URL:-nats://nats:4222}
+      - SUPABASE_URL=${SUPABASE_URL:-http://supabase:3010}
+      - SUPABASE_ANON_KEY=${SUPABASE_ANON_KEY:-}
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:8100/healthz"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    restart: unless-stopped
+    networks:
+      - pmoves-net
+
+networks:
+  pmoves-net:
+    external: true
+    name: pmoves_default
