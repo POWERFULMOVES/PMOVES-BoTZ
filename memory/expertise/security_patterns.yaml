@@ -1,0 +1,65 @@
+# PMOVES-BoTZ Security Expertise
+# Dynamic expertise file - Auditor agent updates with learned vulnerabilities
+
+version: "1.0.0"
+last_updated: "2026-01-23"
+
+# Known vulnerability patterns
+vulnerabilities:
+  injection:
+    - type: "SQL Injection"
+      pattern: "f-string or % formatting in SQL queries"
+      fix: "Use parameterized queries"
+      severity: "CRITICAL"
+
+    - type: "Command Injection"
+      pattern: "shell=True with user input"
+      fix: "Use subprocess with list arguments, never shell=True with untrusted input"
+      severity: "CRITICAL"
+
+    - type: "XSS"
+      pattern: "innerHTML with user input"
+      fix: "Use textContent or sanitize HTML"
+      severity: "HIGH"
+
+  secrets:
+    - type: "Hardcoded Credentials"
+      pattern: "password|secret|api_key|token in source files"
+      fix: "Use environment variables"
+      severity: "CRITICAL"
+
+    - type: "Credential Logging"
+      pattern: "Logging request bodies or auth headers"
+      fix: "Redact sensitive fields before logging"
+      severity: "HIGH"
+
+  configuration:
+    - type: "Debug Mode in Production"
+      pattern: "DEBUG=True or debug=true in prod configs"
+      fix: "Use environment-specific configs"
+      severity: "MEDIUM"
+
+    - type: "Permissive CORS"
+      pattern: "Access-Control-Allow-Origin: *"
+      fix: "Whitelist specific origins"
+      severity: "MEDIUM"
+
+# Learned incidents
+incidents:
+  - id: "inc-001"
+    date: "2026-01-23"
+    type: "Missing Permissions"
+    description: "GitHub workflow lacked explicit GITHUB_TOKEN permissions"
+    resolution: "Added permissions: contents: read at workflow level"
+    lesson: "Always declare minimal permissions in CI/CD workflows"
+
+# Security checklist for code reviews
+checklist:
+  - "Input validation on all user inputs"
+  - "Output encoding for all rendered content"
+  - "Authentication on all sensitive endpoints"
+  - "Authorization checks for resource access"
+  - "Secrets stored in environment variables"
+  - "Dependencies scanned for vulnerabilities"
+  - "Error messages don't leak internal details"
+  - "Logging excludes sensitive data"

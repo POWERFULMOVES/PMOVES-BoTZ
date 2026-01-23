@@ -1,0 +1,102 @@
+# PMOVES-BoTZ Master Orchestration Config
+# Implements the "BotZ" multi-agent swarm architecture
+# Reference: docs/agents/Aligning AI Agents with Indy Dev Dan.md
+
+procs:
+  # 1. THE GATEWAY (The Manager)
+  # Listens for user intent and dispatches tasks.
+  gateway:
+    shell: "echo 'Gateway ready. Awaiting orchestration commands...'"
+    cwd: "."
+    autostart: true
+    env:
+      MPROCS_SERVER: "127.0.0.1:4050"
+      AGENT_ROLE: "gateway"
+
+  # 2. THE ARCHITECT (The Brain - Opus 4.5)
+  # Used for high-level planning and "King Mode" reasoning.
+  # Reads memory/architecture.md first, outputs PLANS not code.
+  architect:
+    shell: |
+      echo "Architect Agent (Opus 4.5) - Planning Mode"
+      echo "Reading: memory/architecture.md"
+      echo "Constraints: security/patterns.yaml"
+      echo "Ready for planning tasks..."
+    cwd: "."
+    stop: "SIGTERM"
+    env:
+      AGENT_ROLE: "architect"
+      MODEL: "opus-4-5"
+      SKILL_PATH: "skills/botz-orchestrator"
+
+  # 3. THE BUILDER (The Hands - Sonnet 3.5)
+  # Executes the plans. Runs in sandboxed environment.
+  builder:
+    shell: |
+      echo "Builder Agent (Sonnet 3.5) - Execution Mode"
+      echo "Sandbox: ACTIVE"
+      echo "Ready for build tasks..."
+    cwd: "."
+    env:
+      AGENT_ROLE: "builder"
+      MODEL: "sonnet-3-5"
+      SKILL_PATH: "skills/code-builder"
+      SANDBOX: "true"
+
+  # 4. THE AUDITOR (The Conscience - Haiku)
+  # Runs probabilistic safety checks on code changes.
+  auditor:
+    shell: |
+      echo "Auditor Agent (Haiku) - Security Review Mode"
+      echo "Patterns: security/patterns.yaml"
+      echo "Ready for security assessments..."
+    cwd: "."
+    env:
+      AGENT_ROLE: "auditor"
+      MODEL: "haiku"
+      SKILL_PATH: "skills/security-auditor"
+
+  # 5. RESEARCHER (The Eyes)
+  # Information gathering and analysis.
+  researcher:
+    shell: |
+      echo "Researcher Agent - Information Gathering Mode"
+      echo "Output: memory/research/"
+      echo "Ready for research tasks..."
+    cwd: "."
+    env:
+      AGENT_ROLE: "researcher"
+      MODEL: "sonnet-3-5"
+
+  # 6. LOG VIEWER
+  # Tail the audit log for monitoring.
+  logs:
+    shell: "tail -f memory/audit/agent_actions.log 2>/dev/null || echo 'Awaiting audit logs...'"
+    cwd: "."
+
+# Remote Control Server
+# Allows the 'Gateway' to programmatically spawn new agent threads.
+# Enables dynamic Parallel Thread (P) patterns.
+server: "127.0.0.1:4050"
+
+# Keymaps for "In-Loop" Control
+keymap:
+  global:
+    "C-g": { c: "focus-proc", name: "gateway" }     # Jump to Gateway
+    "C-a": { c: "focus-proc", name: "architect" }   # Jump to Architect
+    "C-b": { c: "focus-proc", name: "builder" }     # Jump to Builder
+    "C-u": { c: "focus-proc", name: "auditor" }     # Jump to Auditor
+    "C-r": { c: "focus-proc", name: "researcher" }  # Jump to Researcher
+    "C-l": { c: "focus-proc", name: "logs" }        # Jump to Logs
+    "C-s": { c: "start-proc" }                      # Start selected agent
+    "C-x": { c: "term-proc" }                       # Kill selected agent
+    "C-k": { c: "send-keys", keys: "C-c" }          # Send interrupt to agent
+
+# Layout configuration
+layout:
+  type: "columns"
+  procs:
+    - gateway
+    - architect
+    - builder
+    - auditor
