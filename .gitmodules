@@ -40,3 +40,6 @@
 [submodule "features/skills/repos/skills-marketplace"]
 	path = features/skills/repos/skills-marketplace
 	url = https://github.com/mhattingpete/claude-skills-marketplace.git
+[submodule "tools/claude-code-damage-control"]
+	path = tools/claude-code-damage-control
+	url = https://github.com/disler/claude-code-damage-control.git

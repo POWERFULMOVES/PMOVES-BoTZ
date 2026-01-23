@@ -1,0 +1,61 @@
+# PMOVES Gateway Stack - Docker Compose Configuration
+# Includes: python-gateway (port 2091) + mcp-bridge (port 8100)
+#
+# Usage:
+#   docker compose -f features/gateway/docker-compose.yml up -d
+#
+# The python-gateway routes to upstream MCP servers including mcp-bridge
+
+services:
+  python-gateway:
+    build:
+      context: ./python-gateway
+      dockerfile: Dockerfile
+    container_name: pmoves-python-gateway
+    ports:
+      - "2091:2091"
+    environment:
+      - PORT=2091
+      - HOST=0.0.0.0
+    depends_on:
+      mcp-bridge:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:2091/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    restart: unless-stopped
+    networks:
+      - pmoves-net
+
+  mcp-bridge:
+    build:
+      context: ../mcp_bridge
+      dockerfile: Dockerfile
+    container_name: pmoves-mcp-bridge
+    ports:
+      - "8100:8100"
+    environment:
+      - PORT=8100
+      - HOST=0.0.0.0
+      - TENSORZERO_URL=${TENSORZERO_URL:-http://tensorzero:3030}
+      - HIRAG_URL=${HIRAG_URL:-http://hi-rag-gateway-v2:8086}
+      - NATS_URL=${NATS_URL:-nats://nats:4222}
+      - SUPABASE_URL=${SUPABASE_URL:-http://supabase:3010}
+      - SUPABASE_ANON_KEY=${SUPABASE_ANON_KEY:-}
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:8100/healthz"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    restart: unless-stopped
+    networks:
+      - pmoves-net
+
+networks:
+  pmoves-net:
+    external: true
+    name: pmoves_default

@@ -15,18 +15,26 @@ mcpServers:
       webapp-testing, frontend-design, canvas-design, and more.
 
   # Document Processing
+  # Authentication: Uses SUPABASE_JWT_SECRET for Bearer token validation
+  # Header: Authorization: Bearer <jwt_token>
+  # Or query param: ?token=<jwt_token>
+  # See: features/mcp_bridge/auth.py for validation logic
   docling:
-    url: http://localhost:3020/sse
+    url: ${DOCLING_URL:-http://localhost:3020/sse}
     transport: sse
 
   # Code Execution Sandbox
+  # Authentication: Uses SUPABASE_JWT_SECRET for Bearer token validation
+  # Note: E2B_API_KEY is for external E2B API calls, not MCP authentication
   e2b:
-    url: http://localhost:7071/sse
+    url: ${E2B_URL:-http://localhost:7071/sse}
     transport: sse
 
   # Vision-Language Guidance
+  # Authentication: Uses SUPABASE_JWT_SECRET for Bearer token validation
+  # Note: OPENAI_API_KEY is for OpenAI API calls, not MCP authentication
   vl-sentinel:
-    url: http://localhost:7072/sse
+    url: ${VL_SENTINEL_URL:-http://localhost:7072/sse}
     transport: sse
 
   # Persistent Memory & Reasoning
