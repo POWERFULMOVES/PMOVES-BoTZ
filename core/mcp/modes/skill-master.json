@@ -1,0 +1,51 @@
+{
+  "id": "skill-master",
+  "title": "Skill Master - Agent Skills Management",
+  "description": "Access and leverage agent skills library. Skills are instruction-based guides that teach agents how to perform specialized tasks like document editing, MCP development, testing, and visual design.",
+  "whenToUse": [
+    "Learning how to perform a new task",
+    "Finding the right skill for a specialized capability",
+    "Creating or editing documents (docx, xlsx, pptx, pdf)",
+    "Building MCP servers",
+    "Testing web applications",
+    "Creating visual designs or algorithmic art"
+  ],
+  "tools": [
+    "skills:skill_list",
+    "skills:skill_get",
+    "skills:skill_search",
+    "skills:skill_file",
+    "skills:skill_refresh",
+    "cipher-memory:store_memory",
+    "cipher-memory:search_memory"
+  ],
+  "instructions": [
+    "1) Use skill_list to see all available skills when starting a new task.",
+    "2) Use skill_search to find skills matching a capability (e.g., 'document', 'testing', 'design').",
+    "3) Use skill_get to load full skill instructions before attempting a task.",
+    "4) Use skill_file to access templates, scripts, or reference files within a skill.",
+    "5) Follow skill instructions step-by-step for best results.",
+    "6) Store learned patterns and outcomes in cipher-memory for future reference.",
+    "7) Skills are instructions, not code - read and follow them like a guide."
+  ],
+  "skillSources": {
+    "anthropics": "Official Anthropic skills (docx, xlsx, pptx, pdf, mcp-builder)",
+    "huggingface": "HuggingFace ML skills (model training, datasets, evaluation)",
+    "skillcreator": "SkillCreator.ai collection (40+ development, business, integration skills)"
+  },
+  "skillCategories": {
+    "document": ["docx", "xlsx", "pptx", "pdf", "doc-coauthoring"],
+    "development": ["mcp-builder", "skill-creator", "backend-development", "python-development", "javascript-typescript", "database-design", "code-review", "code-refactoring", "code-documentation", "llm-application-dev"],
+    "testing": ["webapp-testing", "qa-regression"],
+    "design": ["frontend-design", "canvas-design", "theme-factory", "brand-guidelines"],
+    "creative": ["algorithmic-art", "slack-gif-creator", "web-artifacts-builder"],
+    "ml-ai": ["model-trainer", "hugging-face-dataset-creator", "hugging-face-evaluation-manager", "hf-tool-builder", "hugging-face-paper-publisher"],
+    "business": ["internal-comms", "meeting-insights-analyzer", "jira-issues", "lead-research-assistant", "content-research-writer"],
+    "productivity": ["file-organizer", "invoice-organizer", "changelog-generator", "job-application"]
+  },
+  "totalSkills": 46,
+  "gateway": {
+    "url": "http://mcp-gateway:2091",
+    "description": "Skills accessed via unified MCP Gateway"
+  }
+}

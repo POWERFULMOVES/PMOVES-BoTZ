@@ -7,6 +7,39 @@
 [submodule "features/cipher/pmoves_cipher"]
 	path = features/cipher/pmoves_cipher
 	url = https://github.com/POWERFULMOVES/Pmoves-cipher.git
+[submodule "PMOVES-awesome-agent-skills"]
+	path = PMOVES-awesome-agent-skills
+	url = https://github.com/POWERFULMOVES/PMOVES-awesome-agent-skills.git
+[submodule "features/skills/repos/anthropics-skills"]
+	path = features/skills/repos/anthropics-skills
+	url = https://github.com/anthropics/skills.git
+[submodule "features/skills/repos/huggingface-skills"]
+	path = features/skills/repos/huggingface-skills
+	url = https://github.com/huggingface/skills.git
+[submodule "features/skills/repos/skillcreator-skills"]
+	path = features/skills/repos/skillcreator-skills
+	url = https://github.com/skillcreatorai/Ai-Agent-Skills.git
+[submodule "features/skills/repos/awesome-claude-skills"]
+	path = features/skills/repos/awesome-claude-skills
+	url = https://github.com/karanb192/awesome-claude-skills.git
+[submodule "features/skills/repos/d3js-skill"]
+	path = features/skills/repos/d3js-skill
+	url = https://github.com/chrisvoncsefalvay/claude-d3js-skill.git
+[submodule "features/skills/repos/obsidian-plugin-skill"]
+	path = features/skills/repos/obsidian-plugin-skill
+	url = https://github.com/gapmiss/obsidian-plugin-skill.git
+[submodule "features/skills/repos/aws-skills"]
+	path = features/skills/repos/aws-skills
+	url = https://github.com/zxkane/aws-skills.git
+[submodule "features/skills/repos/playwright-skill"]
+	path = features/skills/repos/playwright-skill
+	url = https://github.com/lackeyjb/playwright-skill.git
+[submodule "features/skills/repos/epub-skill"]
+	path = features/skills/repos/epub-skill
+	url = https://github.com/smerchek/claude-epub-skill.git
+[submodule "features/skills/repos/skills-marketplace"]
+	path = features/skills/repos/skills-marketplace
+	url = https://github.com/mhattingpete/claude-skills-marketplace.git
 [submodule "tools/claude-code-damage-control"]
 	path = tools/claude-code-damage-control
 	url = https://github.com/disler/claude-code-damage-control.git
