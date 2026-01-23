@@ -1,0 +1,125 @@
+# PMOVES-BoTZ Damage Control Patterns
+# Customized for the PMOVES agentic architecture
+# Based on: tools/claude-code-damage-control and security/patterns.yaml
+
+# Blocked bash command patterns - these commands are always blocked
+bashToolPatterns:
+  # Catastrophic system destruction
+  - pattern: "rm -rf /"
+    reason: "Catastrophic system destruction - blocks entire filesystem deletion"
+  - pattern: "rm -rf /*"
+    reason: "Catastrophic system destruction - blocks root-level wildcard deletion"
+  - pattern: "rm -rf ~"
+    reason: "Home directory destruction - blocks user home deletion"
+  - pattern: "rm -rf ~/*"
+    reason: "Home directory destruction - blocks user home wildcard deletion"
+  - pattern: "sudo rm -rf"
+    reason: "Privileged recursive deletion - extremely dangerous"
+
+  # Git history destruction
+  - pattern: "git push --force"
+    reason: "History rewriting forbidden for agents - requires human approval"
+    ask: true
+  - pattern: "git push -f"
+    reason: "History rewriting forbidden for agents - requires human approval"
+    ask: true
+  - pattern: "git reset --hard"
+    reason: "Uncommitted changes destruction - requires confirmation"
+    ask: true
+
+  # Database destruction
+  - pattern: "DROP DATABASE"
+    reason: "Database destruction requires human approval"
+  - pattern: "drop database"
+    reason: "Database destruction requires human approval"
+  - pattern: "DROP TABLE"
+    reason: "Table destruction requires human approval"
+  - pattern: "drop table"
+    reason: "Table destruction requires human approval"
+  - pattern: "TRUNCATE TABLE"
+    reason: "Table truncation requires human approval"
+    ask: true
+
+  # Filesystem/disk operations
+  - pattern: "mkfs"
+    reason: "Filesystem formatting is forbidden"
+  - pattern: "> /dev/sd"
+    reason: "Direct disk write is forbidden"
+  - pattern: "dd if="
+    reason: "Low-level disk operations require human approval"
+    ask: true
+
+  # Security violations
+  - pattern: "chmod 777"
+    reason: "Insecure permission setting - use minimal permissions"
+  - pattern: "curl | sh"
+    reason: "Piping remote scripts is a security risk"
+  - pattern: "curl | bash"
+    reason: "Piping remote scripts is a security risk"
+  - pattern: "wget -O - | sh"
+    reason: "Piping remote scripts is a security risk"
+
+  # Fork bomb protection
+  - pattern: ":(){ :|:& };:"
+    reason: "Fork bomb detected - system crash prevention"
+
+  # PMOVES-specific patterns
+  - pattern: "docker system prune -a"
+    reason: "Removes all Docker resources - requires confirmation"
+    ask: true
+  - pattern: "npm publish"
+    reason: "Package publishing requires human approval"
+    ask: true
+
+# Zero access paths - agent cannot read or write
+zeroAccessPaths:
+  - ".env"
+  - ".env.*"
+  - "**/.env"
+  - "**/.env.*"
+  - "**/*.pem"
+  - "**/*.key"
+  - "**/credentials.json"
+  - "**/secrets/**"
+  - "**/private/**"
+  - "~/.ssh/**"
+  - "~/.aws/**"
+  - "~/.config/gcloud/**"
+
+# Read-only paths - agent can read but not modify
+readOnlyPaths:
+  - ".git/**"
+  - ".gitmodules"
+  - "security/patterns.yaml"
+  - ".claude/hooks/**"
+  - ".github/workflows/**"
+  - "package-lock.json"
+  - "pnpm-lock.yaml"
+  - "yarn.lock"
+  - "Cargo.lock"
+  - "poetry.lock"
+  - "Pipfile.lock"
+
+# No-delete paths - agent can read/write but not delete
+noDeletePaths:
+  - "core/**"
+  - "features/**"
+  - "docs/**"
+  - "memory/**"
+  - "skills/**"
+  - "src/**"
+  - "tests/**"
+  - "*.md"
+  - "Makefile"
+  - "docker-compose*.yml"
+
+# SQL patterns that require confirmation
+sqlAskPatterns:
+  - pattern: "DELETE FROM"
+    reason: "SQL DELETE requires confirmation"
+    allowedCondition: "WHERE.*id\\s*="  # Allow if specific ID in WHERE
+  - pattern: "UPDATE.*SET"
+    reason: "SQL UPDATE without WHERE is dangerous"
+    allowedCondition: "WHERE"
+  - pattern: "ALTER TABLE"
+    reason: "Schema changes require confirmation"
