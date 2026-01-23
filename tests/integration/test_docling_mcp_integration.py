@@ -26,6 +26,7 @@ from aiohttp import web
 
 # Add the parent directory to the path to import the docling_mcp_server
 sys.path.insert(0, str(Path(__file__).parent.parent))
+sys.path.insert(0, str(Path(__file__).parent.parent / "features" / "docling"))
 
 from docling_mcp_server import DoclingMCPServer, create_custom_sse_handler
 

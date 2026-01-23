@@ -20,7 +20,7 @@ fi
 cd "$(dirname "$0")/pmoves_cipher"
 
 echo "Installing cipher dependencies..."
-pnpm install --frozen-lockfile
+pnpm install --no-frozen-lockfile
 
 echo "Building cipher..."
 pnpm run build:no-ui

@@ -7,3 +7,6 @@
 [submodule "features/cipher/pmoves_cipher"]
 	path = features/cipher/pmoves_cipher
 	url = https://github.com/POWERFULMOVES/Pmoves-cipher.git
+[submodule "tools/claude-code-damage-control"]
+	path = tools/claude-code-damage-control
+	url = https://github.com/disler/claude-code-damage-control.git
