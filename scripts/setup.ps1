@@ -3,8 +3,8 @@ Write-Host "Setting up PMOVES-BoTZ..."
 
 # Check for .env
 if (-not (Test-Path .env)) {
-    Write-Host "Creating .env from example..."
-    Copy-Item example.env .env
+    Write-Host "Creating .env from .env.example..."
+    Copy-Item .env.example .env
 }
 
 # Install dependencies (if any)

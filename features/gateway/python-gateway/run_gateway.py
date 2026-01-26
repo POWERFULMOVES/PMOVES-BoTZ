@@ -12,21 +12,10 @@ logger = logging.getLogger(__name__)
 
 def main():
     logger.info("Starting MCP Gateway...")
-    
-    # Check if catalog file exists
-    catalog_path = '/app/mcp_catalog_multi.yaml'
-    if not os.path.exists(catalog_path):
-        logger.error(f"Catalog file not found at {catalog_path}")
-        sys.exit(1)
-    
-    logger.info(f"Using catalog file: {catalog_path}")
-    
-    # Validate required environment variables
-    required_vars = ['POSTMAN_API_KEY']
-    for var in required_vars:
-        if not os.getenv(var):
-            logger.error(f"Required environment variable {var} not set")
-            sys.exit(1)
+
+    # Gateway uses hardcoded upstream servers in gateway.py
+    # No external catalog file is required
+    logger.info("Using built-in MCP upstream server configuration")
     
     # Start the actual mcp-gateway service
     try:

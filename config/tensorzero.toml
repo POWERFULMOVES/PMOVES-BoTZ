@@ -1,38 +1,122 @@
+# TensorZero Configuration for PMOVES-BoTZ
+# Updated for TensorZero 2026.1.1+ syntax
+
 [gateway]
 bind_address = "0.0.0.0:3000"
 
-[[providers.ollama]]
-type = "ollama"
-url = "http://host.docker.internal:11434"
+# =============================================================================
+# Models - Ollama (via OpenAI-compatible endpoint)
+# =============================================================================
 
-[[providers.openrouter]]
+[models.nemotron_mini]
+routing = ["ollama_local"]
+
+[models.nemotron_mini.providers.ollama_local]
 type = "openai"
-url = "https://openrouter.ai/api/v1"
-# API Key should be set in TENSORZERO_PROVIDER_OPENROUTER_API_KEY environment variable
+model_name = "nemotron-mini"
+api_base = "http://host.docker.internal:11434/v1"
 
-# --- Function: Orchestrator (Main Chat) ---
+[models.qwen3_8b]
+routing = ["ollama_local"]
+
+[models.qwen3_8b.providers.ollama_local]
+type = "openai"
+model_name = "qwen3-embedding:8b"
+api_base = "http://host.docker.internal:11434/v1"
+
+[models.deepseek_cloud]
+routing = ["ollama_local"]
+
+[models.deepseek_cloud.providers.ollama_local]
+type = "openai"
+model_name = "deepseek-v3.2:cloud"
+api_base = "http://host.docker.internal:11434/v1"
+
+[models.kimi_cloud]
+routing = ["ollama_local"]
+
+[models.kimi_cloud.providers.ollama_local]
+type = "openai"
+model_name = "kimi-k2:1t-cloud"
+api_base = "http://host.docker.internal:11434/v1"
+
+[models.glm_cloud]
+routing = ["ollama_local"]
+
+[models.glm_cloud.providers.ollama_local]
+type = "openai"
+model_name = "glm-4.7:cloud"
+api_base = "http://host.docker.internal:11434/v1"
+
+# =============================================================================
+# Models - OpenRouter
+# =============================================================================
+
+[models.glm_4_9b]
+routing = ["openrouter"]
+
+[models.glm_4_9b.providers.openrouter]
+type = "openrouter"
+model_name = "zhipu/glm-4-9b"
+
+[models.glm_4_flash]
+routing = ["openrouter"]
+
+[models.glm_4_flash.providers.openrouter]
+type = "openrouter"
+model_name = "zhipu/glm-4-flash"
+
+[models.glm_4_long]
+routing = ["openrouter"]
+
+[models.glm_4_long.providers.openrouter]
+type = "openrouter"
+model_name = "zhipu/glm-4-long"
+
+# =============================================================================
+# Embedding Models
+# =============================================================================
+
+[embedding_models.qwen3_embed]
+routing = ["ollama_local"]
+
+[embedding_models.qwen3_embed.providers.ollama_local]
+type = "openai"
+model_name = "qwen3-embedding:8b"
+api_base = "http://host.docker.internal:11434/v1"
+
+# =============================================================================
+# Functions
+# =============================================================================
+
+# Orchestrator - Complex reasoning tasks
 [functions.orchestrator]
 type = "chat"
 
-[functions.orchestrator.variants.primary_cloud]
-provider = "openrouter"
-model = "nvidia/nemotron-4-340b-instruct"
+[functions.orchestrator.variants.primary]
+type = "chat_completion"
+model = "glm_cloud"
 weight = 1.0
 
-# --- Function: Utility (Nemotron Nano) ---
+[functions.orchestrator.variants.deepseek]
+type = "chat_completion"
+model = "deepseek_cloud"
+weight = 0.5
+
+# Utility - Fast simple tasks
 [functions.utility]
 type = "chat"
 
-[functions.utility.variants.primary_local]
-provider = "ollama"
-model = "nemotron-mini"
+[functions.utility.variants.primary]
+type = "chat_completion"
+model = "nemotron_mini"
 weight = 1.0
 
-# --- Function: Embedding (Qwen 8b/7b) ---
-[functions.embed]
-type = "embedding"
+[functions.utility.variants.kimi]
+type = "chat_completion"
+model = "kimi_cloud"
+weight = 0.3
 
-[functions.embed.variants.primary]
-provider = "ollama"
-model = "qwen2.5:7b"
-weight = 1.0
+# Embedding - Vector embeddings
+# NOTE: Embeddings are accessed via /embeddings API endpoint using embedding_models directly
+# No function wrapper needed - use embedding_models.qwen3_embed
