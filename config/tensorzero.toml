@@ -1,22 +1,67 @@
+# =============================================================================
+# PMOVES-BoTZ TensorZero Gateway Configuration
+# Schema: TensorZero 2026.1.1+
+# =============================================================================
+
 [gateway]
 bind_address = "0.0.0.0:3000"
 
-[[providers.ollama]]
-type = "ollama"
-url = "http://host.docker.internal:11434"
+# =============================================================================
+# Models
+# =============================================================================
 
-[[providers.openrouter]]
+# --- Orchestrator Model (Local Ollama) ---
+# For cloud fallback, uncomment openrouter provider below and add to routing
+[models.orchestrator]
+routing = ["ollama"]
+
+[models.orchestrator.providers.ollama]
 type = "openai"
-url = "https://openrouter.ai/api/v1"
-# API Key should be set in TENSORZERO_PROVIDER_OPENROUTER_API_KEY environment variable
+api_base = "http://host.docker.internal:11434/v1"
+model_name = "nemotron-mini"
+api_key_location = "none"
+
+# OpenRouter cloud fallback (optional - requires OPENROUTER_API_KEY)
+# Uncomment when API key is available:
+# [models.orchestrator.providers.openrouter]
+# type = "openrouter"
+# model_name = "nvidia/nemotron-4-340b-instruct"
+# api_key_location = "env::OPENROUTER_API_KEY"
+
+# --- Utility Model (Local Ollama) ---
+[models.utility]
+routing = ["ollama"]
+
+[models.utility.providers.ollama]
+type = "openai"
+api_base = "http://host.docker.internal:11434/v1"
+model_name = "nemotron-mini"
+api_key_location = "none"
+
+# =============================================================================
+# Embedding Models
+# =============================================================================
+
+[embedding_models.qwen_embed]
+routing = ["ollama"]
+
+[embedding_models.qwen_embed.providers.ollama]
+type = "openai"
+api_base = "http://host.docker.internal:11434/v1"
+model_name = "qwen2.5:7b"
+api_key_location = "none"
+
+# =============================================================================
+# Functions
+# =============================================================================
 
 # --- Function: Orchestrator (Main Chat) ---
 [functions.orchestrator]
 type = "chat"
 
 [functions.orchestrator.variants.primary_cloud]
-provider = "openrouter"
-model = "nvidia/nemotron-4-340b-instruct"
+type = "chat_completion"
+model = "orchestrator"
 weight = 1.0
 
 # --- Function: Utility (Nemotron Nano) ---
@@ -24,15 +69,15 @@ weight = 1.0
 type = "chat"
 
 [functions.utility.variants.primary_local]
-provider = "ollama"
-model = "nemotron-mini"
+type = "chat_completion"
+model = "utility"
 weight = 1.0
 
-# --- Function: Embedding (Qwen 8b/7b) ---
+# --- Function: Embedding ---
 [functions.embed]
-type = "embedding"
+type = "chat"
 
 [functions.embed.variants.primary]
-provider = "ollama"
-model = "qwen2.5:7b"
+type = "chat_completion"
+model = "utility"
 weight = 1.0
