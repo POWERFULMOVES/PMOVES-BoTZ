@@ -12,10 +12,10 @@ llm:
   temperature: 0.7
   maxTokens: 2048
 
-# Embedding Configuration - TensorZero with qwen3:8b
+# Embedding Configuration - TensorZero with qwen3_embed
 embedding:
   type: openai
-  model: qwen3:8b
+  model: qwen3_embed
   apiKey: $TENSORZERO_API_KEY
   baseURL: ${TENSORZERO_URL:-http://host.docker.internal:3030}/openai/v1
   dimensions: 4096
