@@ -2,9 +2,9 @@ name: CI
 
 on:
   push:
-    branches: [main, codex-*]
+    branches: [main, codex-*, PMOVES.AI-Edition-Hardened]
   pull_request:
-    branches: [main]
+    branches: [main, PMOVES.AI-Edition-Hardened]
 
 # Security: Explicit permissions following BoTZ "Defense in Depth" doctrine
 # Minimal permissions prevent GITHUB_TOKEN abuse if workflow is compromised
