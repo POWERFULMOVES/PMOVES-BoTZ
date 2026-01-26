@@ -32,6 +32,15 @@ else
     echo "Run 'make env-init' to create it."
 fi
 
+# Load local overrides from .env.local (Universal Credentials pattern)
+if [[ -f "${BOTZ_ROOT}/.env.local" ]]; then
+    echo "Loading .env.local..."
+    set -a
+    # shellcheck source=/dev/null
+    source "${BOTZ_ROOT}/.env.local"
+    set +a
+fi
+
 echo ""
 
 # Required variables
