@@ -104,6 +104,7 @@ services:
       retries: 3
 
   # 6. Cipher Memory (Data Layer)
+  # NOTE: Migrated from Venice.ai to TensorZero/Ollama (2025-01-25)
   cipher-memory:
     build:
       context: ../../features/cipher
@@ -112,9 +113,12 @@ services:
     stdin_open: true
     tty: true
     environment:
-      - VENICE_API_KEY=${VENICE_API_KEY}
+      - OLLAMA_BASE_URL=${OLLAMA_BASE_URL:-http://host.docker.internal:11434}
+      - TENSORZERO_URL=${TENSORZERO_URL:-http://tensorzero:3000}
+      - TENSORZERO_API_KEY=${TENSORZERO_API_KEY:-}
       - CIPHER_CONFIG_PATH=/app/features/cipher/pmoves_cipher/memAgent/cipher_pmoves.yml
       - CIPHER_MEMORY_PORT=${CIPHER_MEMORY_PORT:-8081}
+      - TZ=${TZ:-America/New_York}
     volumes:
       - ../../features/cipher/pmoves_cipher:/app/features/cipher/pmoves_cipher:ro
       - cipher_data:/data
@@ -202,12 +206,33 @@ services:
       - pmoves_app
       - pmoves_data
 
+  # 10. Skills Library (Agent Skills Management)
+  skills:
+    build:
+      context: ../../features/skills
+      dockerfile: Dockerfile
+    container_name: pmz-skills
+    stdin_open: true
+    tty: true
+    volumes:
+      - ../../features/skills/library:/app/library:ro
+      - ../../features/skills/repos:/app/repos:ro
+    labels:
+      pmoves.service: "skills"
+      pmoves.mcp: "true"
+    networks:
+      - pmoves_app  # Internal tool access
+
   # 8. TensorZero (Gateway/Inference)
   tensorzero:
     container_name: pmz-tensorzero
     image: tensorzero/gateway:latest
     environment:
       - PORT=3000
+      # Dummy API key for Ollama (OpenAI-compatible endpoint doesn't validate)
+      - OPENAI_API_KEY=sk-ollama-local-no-key-needed
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY:-}
+      - TZ=${TZ:-America/New_York}
     ports:
       - "${TENSORZERO_PORT:-3006}:3000"
     volumes:

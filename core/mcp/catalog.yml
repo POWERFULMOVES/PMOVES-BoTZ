@@ -1,4 +1,19 @@
 mcpServers:
+  # Agent Skills Library
+  skills:
+    command: docker
+    args:
+      - exec
+      - -i
+      - pmz-skills
+      - python
+      - skill_server.py
+    description: |
+      Agent skill management (list, get, search skills).
+      Skills are instruction-based guides that teach agents how to perform tasks.
+      Available skills: docx, xlsx, pptx, pdf, mcp-builder, skill-creator,
+      webapp-testing, frontend-design, canvas-design, and more.
+
   # Document Processing
   # Authentication: Uses SUPABASE_JWT_SECRET for Bearer token validation
   # Header: Authorization: Bearer <jwt_token>

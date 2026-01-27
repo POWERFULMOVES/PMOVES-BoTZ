@@ -1,0 +1,40 @@
+{
+  "id": "document-skills",
+  "title": "Document Skills - Office Document Processing",
+  "description": "Specialized mode for creating, editing, and analyzing Office documents. Combines docling for parsing with skills for document manipulation (Word, Excel, PowerPoint, PDF).",
+  "whenToUse": [
+    "Creating or editing Word documents (.docx)",
+    "Building spreadsheets with formulas and charts (.xlsx)",
+    "Generating or modifying presentations (.pptx)",
+    "Extracting data from PDFs",
+    "Document format conversion",
+    "Data analysis from tabular documents"
+  ],
+  "tools": [
+    "skills:skill_get",
+    "skills:skill_file",
+    "docling:convert_document",
+    "docling:extract_tables",
+    "e2b:sandbox_run",
+    "cipher-memory:store_memory",
+    "cipher-memory:search_memory"
+  ],
+  "instructions": [
+    "1) Load the appropriate skill first: docx, xlsx, pptx, or pdf.",
+    "2) Use skill_file to access templates and helper scripts.",
+    "3) Use docling to parse existing documents and extract content.",
+    "4) Use e2b sandbox to run document manipulation scripts.",
+    "5) Follow skill instructions for proper document structure and formatting.",
+    "6) Store document patterns and templates in cipher-memory for reuse."
+  ],
+  "skills": {
+    "docx": "Word document creation with tracked changes, styles, and formatting",
+    "xlsx": "Spreadsheet manipulation with formulas, charts, and data transformations",
+    "pptx": "PowerPoint slides with layouts, templates, and animations",
+    "pdf": "PDF text extraction, table parsing, and metadata"
+  },
+  "gateway": {
+    "url": "http://mcp-gateway:2091",
+    "description": "Document tools accessed via unified MCP Gateway"
+  }
+}

@@ -7,11 +7,10 @@
 bind_address = "0.0.0.0:3000"
 
 # =============================================================================
-# Models
+# Models - Core Functions (Local Ollama)
 # =============================================================================
 
-# --- Orchestrator Model (Local Ollama) ---
-# For cloud fallback, uncomment openrouter provider below and add to routing
+# --- Orchestrator Model (Complex reasoning tasks) ---
 [models.orchestrator]
 routing = ["ollama"]
 
@@ -21,14 +20,7 @@ api_base = "http://host.docker.internal:11434/v1"
 model_name = "nemotron-mini"
 api_key_location = "none"
 
-# OpenRouter cloud fallback (optional - requires OPENROUTER_API_KEY)
-# Uncomment when API key is available:
-# [models.orchestrator.providers.openrouter]
-# type = "openrouter"
-# model_name = "nvidia/nemotron-4-340b-instruct"
-# api_key_location = "env::OPENROUTER_API_KEY"
-
-# --- Utility Model (Local Ollama) ---
+# --- Utility Model (Fast simple tasks) ---
 [models.utility]
 routing = ["ollama"]
 
@@ -39,9 +31,96 @@ model_name = "nemotron-mini"
 api_key_location = "none"
 
 # =============================================================================
+# Models - Extended Ollama (Cloud-hosted via Ollama)
+# =============================================================================
+
+[models.nemotron_mini]
+routing = ["ollama_local"]
+
+[models.nemotron_mini.providers.ollama_local]
+type = "openai"
+model_name = "nemotron-mini"
+api_base = "http://host.docker.internal:11434/v1"
+api_key_location = "none"
+
+[models.qwen3_8b]
+routing = ["ollama_local"]
+
+[models.qwen3_8b.providers.ollama_local]
+type = "openai"
+model_name = "qwen3-embedding:8b"
+api_base = "http://host.docker.internal:11434/v1"
+api_key_location = "none"
+
+[models.deepseek_cloud]
+routing = ["ollama_local"]
+
+[models.deepseek_cloud.providers.ollama_local]
+type = "openai"
+model_name = "deepseek-v3.2:cloud"
+api_base = "http://host.docker.internal:11434/v1"
+api_key_location = "none"
+
+[models.kimi_cloud]
+routing = ["ollama_local"]
+
+[models.kimi_cloud.providers.ollama_local]
+type = "openai"
+model_name = "kimi-k2:1t-cloud"
+api_base = "http://host.docker.internal:11434/v1"
+api_key_location = "none"
+
+[models.glm_cloud]
+routing = ["ollama_local"]
+
+[models.glm_cloud.providers.ollama_local]
+type = "openai"
+model_name = "glm-4.7:cloud"
+api_base = "http://host.docker.internal:11434/v1"
+api_key_location = "none"
+
+# =============================================================================
+# Models - OpenRouter
+# =============================================================================
+
+[models.glm_4_9b]
+routing = ["openrouter"]
+
+[models.glm_4_9b.providers.openrouter]
+type = "openrouter"
+model_name = "zhipu/glm-4-9b"
+api_key_location = "env::OPENROUTER_API_KEY"
+
+[models.glm_4_flash]
+routing = ["openrouter"]
+
+[models.glm_4_flash.providers.openrouter]
+type = "openrouter"
+model_name = "zhipu/glm-4-flash"
+api_key_location = "env::OPENROUTER_API_KEY"
+
+[models.glm_4_long]
+routing = ["openrouter"]
+
+[models.glm_4_long.providers.openrouter]
+type = "openrouter"
+model_name = "zhipu/glm-4-long"
+api_key_location = "env::OPENROUTER_API_KEY"
+
+# =============================================================================
 # Embedding Models
 # =============================================================================
 
+[embedding_models.qwen3_embed]
+routing = ["ollama_local"]
+
+[embedding_models.qwen3_embed.providers.ollama_local]
+type = "openai"
+model_name = "qwen3-embedding:8b"
+api_base = "http://host.docker.internal:11434/v1"
+api_key_location = "none"
+
+# Qwen 2.5 embedding model (smaller, faster)
 [embedding_models.qwen_embed]
 routing = ["ollama"]
 
@@ -55,29 +134,38 @@ api_key_location = "none"
 # Functions
 # =============================================================================
 
-# --- Function: Orchestrator (Main Chat) ---
+# Orchestrator - Complex reasoning tasks
 [functions.orchestrator]
 type = "chat"
 
-[functions.orchestrator.variants.primary_cloud]
+[functions.orchestrator.variants.primary]
 type = "chat_completion"
 model = "orchestrator"
 weight = 1.0
 
-# --- Function: Utility (Nemotron Nano) ---
+[functions.orchestrator.variants.glm_cloud]
+type = "chat_completion"
+model = "glm_cloud"
+weight = 0.5
+
+[functions.orchestrator.variants.deepseek]
+type = "chat_completion"
+model = "deepseek_cloud"
+weight = 0.5
+
+# Utility - Fast simple tasks
 [functions.utility]
 type = "chat"
 
-[functions.utility.variants.primary_local]
+[functions.utility.variants.primary]
 type = "chat_completion"
 model = "utility"
 weight = 1.0
 
-# --- Function: Embedding ---
-[functions.embed]
-type = "chat"
-
-[functions.embed.variants.primary]
+[functions.utility.variants.kimi]
 type = "chat_completion"
-model = "utility"
-weight = 1.0
+model = "kimi_cloud"
+weight = 0.3
+
+# NOTE: Embeddings are accessed via /embeddings API endpoint using embedding_models directly
+# See embedding_models section above for qwen3_embed and qwen_embed definitions

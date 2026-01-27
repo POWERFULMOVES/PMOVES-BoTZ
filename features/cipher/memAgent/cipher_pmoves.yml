@@ -1,28 +1,48 @@
 # PMOVES Cipher Configuration
-# This configuration uses Venice.ai OpenAI-compatible models
+# TensorZero-ONLY Configuration for unified LLM orchestration
+# Migrated from Venice.ai - All inference routed through TensorZero gateway
 
-# LLM Configuration
+# LLM Configuration - TensorZero Orchestrator
 llm:
   provider: openai
-  model: llama-3.2-3b-instruct
-  apiKey: $VENICE_API_KEY
-  baseURL: https://api.venice.ai/api/v1
+  model: orchestrator
+  apiKey: $TENSORZERO_API_KEY
+  baseURL: ${TENSORZERO_URL:-http://host.docker.internal:3030}/openai/v1
+  maxIterations: 50
+  temperature: 0.7
+  maxTokens: 2048
 
-# Memory Configuration
+# Embedding Configuration - TensorZero with qwen3_embed
+embedding:
+  type: openai
+  model: qwen3_embed
+  apiKey: $TENSORZERO_API_KEY
+  baseURL: ${TENSORZERO_URL:-http://host.docker.internal:3030}/openai/v1
+  dimensions: 4096
+
+# Memory Configuration - Enhanced for Level 2
 memory:
+  # Persist memories across sessions
+  persistAcrossSessions: true
+
+  # Enable project-level memory sharing
+  projectMemory: true
+
   # Vector storage backend
   vectorStore:
     type: in-memory
-    dimensions: 1536
-    
+    dimensions: 4096
+
   # Knowledge graph configuration
   knowledgeGraph:
     type: in-memory
-    
+    enableRelationships: true
+
   # Storage configuration
   storage:
     type: sqlite
     path: ./data/cipher_memory.db
+    enableBackup: true
 
 # Processing Configuration
 processing:
@@ -31,13 +51,28 @@ processing:
     type: semantic
     maxChunkSize: 1000
     overlap: 200
-    
-  # Embedding configuration
-  embedding:
-    provider: openai
-    model: text-embedding-3-small
-    apiKey: $VENICE_API_KEY
-    baseURL: https://api.venice.ai/api/v1
+
+  # Entity extraction
+  entityExtraction:
+    enabled: true
+    types:
+      - person
+      - organization
+      - concept
+      - workflow
+      - api
+
+# Reasoning Configuration - Level 2 Self-Evolution
+reasoning:
+  enabled: true
+  extractPatterns: true
+  patternTypes:
+    - workflow_execution
+    - api_call_sequence
+    - error_resolution
+    - optimization_opportunity
+  minConfidence: 0.7
+  maxPatternsPerSession: 100
 
 # System Prompt Configuration
 systemPrompt:
@@ -45,14 +80,38 @@ systemPrompt:
   content: |
     You are an AI memory assistant for PMOVES multi-agent workflows.
     Your role is to manage persistent knowledge, reasoning patterns, and cross-session learning.
+
+    Key responsibilities:
+    1. Store and retrieve memories with semantic understanding
+    2. Extract patterns from agent interactions for future optimization
+    3. Maintain knowledge graph relationships between entities
+    4. Support reasoning trace storage for decision transparency
+    5. Enable project-level memory sharing across agent sessions
+
     Always provide accurate, contextual responses based on stored memories and current context.
+    When patterns are detected, flag them for potential automation or optimization.
 
 # MCP Configuration
 mcp:
   enabled: true
   port: 3000
-  
+  exposeReasoningTools: true
+
+# NATS Event Publishing
+nats:
+  enabled: true
+  subjects:
+    memoryStored: botz.cipher.memory.stored.v1
+    memoryRecalled: botz.cipher.memory.recalled.v1
+    patternDetected: botz.cipher.pattern.detected.v1
+    reasoningComplete: botz.cipher.reasoning.complete.v1
+
 # Logging Configuration
 logging:
   level: info
   file: ./logs/cipher.log
+  enableTracing: true
+  traceSubjects:
+    - memory_operations
+    - pattern_extraction
+    - reasoning_chains
