@@ -11,6 +11,25 @@ PMOVES-BoTZ is a **unified multi-agent MCP platform** providing:
 - Vision-language processing (VL Sentinel)
 - API testing automation (Postman)
 - Workflow automation (n8n integration)
+- Security hooks for agent safety (patterns.yaml + hooks/)
+
+## Security Hooks
+
+Agent safety is enforced via `patterns.yaml` and the `hooks/` directory:
+
+| File | Purpose |
+|------|---------|
+| `patterns.yaml` | Security constitution with deterministic rules and path protection |
+| `hooks/pre_command.py` | Pre-execution validation for Bash/Edit/Write tools |
+| `hooks/prompt_scan.py` | LLM-based prompt injection detection |
+| `hooks/audit_log.py` | Post-execution logging to `memory/audit/` |
+
+**Path Protection Tiers:**
+- **Zero-access:** `.env*`, `*.pem`, `*.key`, `**/secrets/**` (no read/write)
+- **Read-only:** `.git/`, `patterns.yaml`, `*.lock` (read allowed, no modify)
+- **No-delete:** `core/**`, `features/**`, `docs/**` (modify allowed, no delete)
+
+**Run tests:** `python hooks/test_hooks.py`
 
 ## MCP Server Catalog
 

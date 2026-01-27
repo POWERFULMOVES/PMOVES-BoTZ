@@ -22,14 +22,26 @@ import os
 from pathlib import Path
 from typing import Tuple
 
-# Add parent directory to path for imports
-sys.path.insert(0, str(Path(__file__).parent))
+# Ensure hooks directory is in path for imports
+# This handles both direct execution and pytest discovery
+_HOOKS_DIR = Path(__file__).parent.resolve()
+_PROJECT_ROOT = _HOOKS_DIR.parent
+
+if str(_HOOKS_DIR) not in sys.path:
+    sys.path.insert(0, str(_HOOKS_DIR))
+if str(_PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(_PROJECT_ROOT))
 
 import yaml
 
 # Import the modules we're testing
-from pre_command import check_command, check_file_operation, load_config
-from prompt_scan import quick_heuristic_check, Verdict
+try:
+    from pre_command import check_command, check_file_operation, load_config
+    from prompt_scan import quick_heuristic_check, Verdict
+except ImportError:
+    # Fallback for different import contexts
+    from hooks.pre_command import check_command, check_file_operation, load_config
+    from hooks.prompt_scan import quick_heuristic_check, Verdict
 
 
 def load_test_config() -> dict:

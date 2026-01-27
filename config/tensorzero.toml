@@ -59,6 +59,7 @@ routing = ["ollama_local"]
 type = "openai"
 model_name = "deepseek-v3.2:cloud"
 api_base = "http://host.docker.internal:11434/v1"
+api_key_location = "none"
 
 [models.kimi_cloud]
 routing = ["ollama_local"]
@@ -67,6 +68,7 @@ routing = ["ollama_local"]
 type = "openai"
 model_name = "kimi-k2:1t-cloud"
 api_base = "http://host.docker.internal:11434/v1"
+api_key_location = "none"
 
 [models.glm_cloud]
 routing = ["ollama_local"]
@@ -75,6 +77,7 @@ routing = ["ollama_local"]
 type = "openai"
 model_name = "glm-4.7:cloud"
 api_base = "http://host.docker.internal:11434/v1"
+api_key_location = "none"
 
 # =============================================================================
 # Models - OpenRouter
@@ -86,6 +89,7 @@ routing = ["openrouter"]
 [models.glm_4_9b.providers.openrouter]
 type = "openrouter"
 model_name = "zhipu/glm-4-9b"
+api_key_location = "env::OPENROUTER_API_KEY"
 
 [models.glm_4_flash]
 routing = ["openrouter"]
@@ -93,6 +97,7 @@ routing = ["openrouter"]
 [models.glm_4_flash.providers.openrouter]
 type = "openrouter"
 model_name = "zhipu/glm-4-flash"
+api_key_location = "env::OPENROUTER_API_KEY"
 
 [models.glm_4_long]
 routing = ["openrouter"]
@@ -100,6 +105,7 @@ routing = ["openrouter"]
 [models.glm_4_long.providers.openrouter]
 type = "openrouter"
 model_name = "zhipu/glm-4-long"
+api_key_location = "env::OPENROUTER_API_KEY"
 
 # =============================================================================
 # Embedding Models
@@ -112,6 +118,17 @@ routing = ["ollama_local"]
 type = "openai"
 model_name = "qwen3-embedding:8b"
 api_base = "http://host.docker.internal:11434/v1"
+api_key_location = "none"
+
+# Qwen 2.5 embedding model (smaller, faster)
+[embedding_models.qwen_embed]
+routing = ["ollama"]
+
+[embedding_models.qwen_embed.providers.ollama]
+type = "openai"
+api_base = "http://host.docker.internal:11434/v1"
+model_name = "qwen2.5:7b"
+api_key_location = "none"
 
 # =============================================================================
 # Functions
@@ -150,16 +167,5 @@ type = "chat_completion"
 model = "kimi_cloud"
 weight = 0.3
 
-# =============================================================================
-# Embedding Models
-# =============================================================================
 # NOTE: Embeddings are accessed via /embeddings API endpoint using embedding_models directly
-
-[embedding_models.qwen_embed]
-routing = ["ollama"]
-
-[embedding_models.qwen_embed.providers.ollama]
-type = "openai"
-api_base = "http://host.docker.internal:11434/v1"
-model_name = "qwen2.5:7b"
-api_key_location = "none"
+# See embedding_models section above for qwen3_embed and qwen_embed definitions
