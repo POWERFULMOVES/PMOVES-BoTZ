@@ -41,15 +41,17 @@ from . import media
 from . import knowledge
 from . import a2a
 from . import geometry
+from . import tts
 
 __all__ = [
     "register_slice",
     "get_slice",
     "list_slices",
-    "research",
-    "code_review",
-    "media",
-    "knowledge",
     "a2a",
+    "code_review",
     "geometry",
+    "knowledge",
+    "media",
+    "research",
+    "tts",
 ]
