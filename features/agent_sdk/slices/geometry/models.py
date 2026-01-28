@@ -135,10 +135,12 @@ class GeometryPacket:
     def calculate_entropy(self) -> float:
         """Calculate Shannon entropy of the shape's attributes."""
         if not self.attributes:
+            self.entropy = 0.0
             return 0.0
 
         confidences = [a.confidence for a in self.attributes if a.confidence > 0]
         if not confidences:
+            self.entropy = 0.0
             return 0.0
 
         # Normalize to probabilities

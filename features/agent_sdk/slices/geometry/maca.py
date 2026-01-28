@@ -101,6 +101,7 @@ class MACAConsensus:
         self._votes: Dict[str, List[ConsensusVote]] = {}
         self._initial_entropy: Dict[str, float] = {}
         self._round_counts: Dict[str, int] = {}
+        self._participants: Dict[str, List[str]] = {}  # Expected voters per proposal
 
     def propose(
         self,
@@ -123,10 +124,12 @@ class MACAConsensus:
         self._votes[packet.id] = []
         self._initial_entropy[packet.id] = packet.entropy
         self._round_counts[packet.id] = 0
+        self._participants[packet.id] = participants or []
 
         logger.info(
             f"MACA proposal: {packet.name} "
-            f"(initial entropy: {packet.entropy:.4f})"
+            f"(initial entropy: {packet.entropy:.4f}, "
+            f"participants: {len(participants or [])})"
         )
         return packet.id
 
@@ -335,6 +338,7 @@ class MACAConsensus:
         self._votes.pop(packet_id, None)
         self._initial_entropy.pop(packet_id, None)
         self._round_counts.pop(packet_id, None)
+        self._participants.pop(packet_id, None)
 
     def get_pending_proposals(self) -> List[str]:
         """Get list of pending proposal IDs."""
@@ -348,6 +352,8 @@ class MACAConsensus:
         packet = self._proposals[packet_id]
         votes = self._votes[packet_id]
 
+        participants = self._participants.get(packet_id, [])
+        voters = set(v.agent_id for v in votes)
         return {
             "packet_id": packet_id,
             "name": packet.name,
@@ -355,4 +361,6 @@ class MACAConsensus:
             "current_score": sum(v.vote for v in votes) / len(votes) if votes else 0,
             "entropy_reduction": sum(v.entropy_delta for v in votes),
             "rounds": self._round_counts.get(packet_id, 0),
+            "expected_participants": participants,
+            "pending_participants": [p for p in participants if p not in voters],
         }

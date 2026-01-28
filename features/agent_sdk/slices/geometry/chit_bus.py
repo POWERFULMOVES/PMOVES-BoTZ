@@ -253,8 +253,9 @@ class CHITBus:
         Returns:
             Reconstructed GeometryPacket
         """
-        # Check cache first
-        cached = self._cache.get(message.packet_id)
+        # Check cache first (use truncated ID to match wire format)
+        cache_key = message.packet_id[:8]
+        cached = self._cache.get(cache_key)
         if cached:
             return cached
 
@@ -277,9 +278,14 @@ class CHITBus:
         return packet
 
     def _cache_packet(self, packet: GeometryPacket) -> None:
-        """Add packet to local cache."""
-        self._cache[packet.id] = packet
-        self._cache_timestamps[packet.id] = time.time()
+        """Add packet to local cache.
+
+        Uses truncated packet ID (first 8 chars) as cache key to match
+        the wire format used in CHITMessage serialization.
+        """
+        cache_key = packet.id[:8]
+        self._cache[cache_key] = packet
+        self._cache_timestamps[cache_key] = time.time()
         self._cleanup_cache()
 
     def _cleanup_cache(self) -> None:

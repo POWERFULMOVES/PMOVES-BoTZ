@@ -21,6 +21,7 @@ class RetrievalMode(Enum):
 
 class IndexOperation(Enum):
     """Index operations for knowledge management."""
+    RETRIEVE = "retrieve"      # Query/search knowledge
     INGEST = "ingest"          # Add new documents
     UPDATE = "update"          # Update existing
     DELETE = "delete"          # Remove documents
@@ -50,7 +51,7 @@ class KnowledgeChunk:
 class KnowledgeTask:
     """A knowledge management task specification."""
     id: str = field(default_factory=lambda: str(uuid.uuid4()))
-    operation: IndexOperation = IndexOperation.INGEST
+    operation: IndexOperation = IndexOperation.RETRIEVE
     query: Optional[str] = None  # For retrieval operations
     documents: List[Dict] = field(default_factory=list)  # For ingest operations
     retrieval_mode: RetrievalMode = RetrievalMode.HYBRID

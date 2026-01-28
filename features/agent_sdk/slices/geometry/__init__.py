@@ -28,21 +28,17 @@ from .. import register_slice
 register_slice("geometry")(ShapeAttributor)
 
 __all__ = [
-    # Models
-    "GeometryPacket",
-    "ShapeAttribute",
-    "TopologyFeature",
     "AnchorVector",
-    "ConsensusVote",
-    "EntropyMetric",
-    # Shape Attribution
-    "ShapeAttributor",
-    "GeometryNormalizer",
-    "CompositeBuilder",
-    # CHIT Bus
     "CHITBus",
     "CHITMessage",
-    # MACA Consensus
-    "MACAConsensus",
+    "CompositeBuilder",
     "ConsensusResult",
+    "ConsensusVote",
+    "EntropyMetric",
+    "GeometryNormalizer",
+    "GeometryPacket",
+    "MACAConsensus",
+    "ShapeAttribute",
+    "ShapeAttributor",
+    "TopologyFeature",
 ]

@@ -37,11 +37,20 @@ try:
     A2A_AVAILABLE = True
 except ImportError:
     A2A_AVAILABLE = False
-    # Stub types
+    # Stub all exported symbols when A2A module unavailable
     AgentCard = None
-    A2AClient = None
+    AgentCapability = None
+    AgentSkill = None
     Task = None
     TaskState = None
+    TaskMessage = None
+    TaskArtifact = None
+    A2AClient = None
+    RemoteAgent = None
+
+    async def execute_remote_task(*args, **kwargs):
+        """Stub for execute_remote_task when A2A unavailable."""
+        raise ImportError("A2A module is not available")
 
 from .service import A2AService
 from .. import register_slice

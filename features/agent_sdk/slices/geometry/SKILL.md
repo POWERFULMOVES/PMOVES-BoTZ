@@ -87,7 +87,7 @@ if result.entropy_metric.converged:
 
 MACA value is defined by entropy change:
 
-```
+```text
 ΔS = S_initial - S_final
 ```
 
@@ -116,7 +116,7 @@ Holographic compression of geometry:
 
 ## Pipeline Stages
 
-```
+```text
 Input Data
     ↓
 [Geometry Normalizer] → Common coordinate system

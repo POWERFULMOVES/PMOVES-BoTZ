@@ -79,15 +79,22 @@ class KnowledgeService:
         """
         start_time = time.time()
 
-        if task.operation == IndexOperation.INGEST:
+        if task.operation == IndexOperation.RETRIEVE:
+            result = await self._retrieve(task)
+        elif task.operation == IndexOperation.INGEST:
             result = await self._ingest(task)
         elif task.operation == IndexOperation.UPDATE:
             result = await self._update(task)
         elif task.operation == IndexOperation.DELETE:
             result = await self._delete(task)
+        elif task.operation == IndexOperation.REINDEX:
+            result = await self._reindex(task)
         else:
-            # Default to retrieval
-            result = await self._retrieve(task)
+            # Unknown operation - error
+            result = KnowledgeResult(
+                task_id=task.id,
+                error=f"Unknown operation: {task.operation}",
+            )
 
         result.duration_ms = int((time.time() - start_time) * 1000)
         return result
@@ -218,6 +225,41 @@ class KnowledgeService:
 
         except Exception as e:
             logger.error(f"Knowledge deletion failed: {e}")
+            return KnowledgeResult(
+                task_id=task.id,
+                error=str(e),
+            )
+
+    async def _reindex(self, task: KnowledgeTask) -> KnowledgeResult:
+        """Trigger full reindex of knowledge base."""
+        if not self.http_client:
+            return KnowledgeResult(
+                task_id=task.id,
+                error="HTTP client not configured",
+            )
+
+        logger.info("Triggering full knowledge base reindex...")
+
+        try:
+            response = await self.http_client.post(
+                f"{self.hirag_url}/hirag/reindex",
+                json={
+                    "filters": task.filters,
+                    "metadata": task.metadata,
+                },
+                timeout=600.0,  # Reindex can take a long time
+            )
+            response.raise_for_status()
+            data = response.json()
+
+            return KnowledgeResult(
+                task_id=task.id,
+                documents_processed=data.get("reindexed", 0),
+                total_found=data.get("total_documents", 0),
+            )
+
+        except Exception as e:
+            logger.error(f"Knowledge reindex failed: {e}")
             return KnowledgeResult(
                 task_id=task.id,
                 error=str(e),

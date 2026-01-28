@@ -41,7 +41,13 @@ class TaskStore:
         with self._lock:
             # Evict old completed tasks if at capacity
             if len(self._tasks) >= self._max_tasks:
-                self._evict_old_tasks()
+                evicted = self._evict_old_tasks()
+                # If no tasks were evicted and still at capacity, raise error
+                if evicted == 0 and len(self._tasks) >= self._max_tasks:
+                    raise ValueError(
+                        f"Task store at capacity ({self._max_tasks}). "
+                        "No completed tasks available for eviction."
+                    )
 
             task = Task(
                 skill_id=skill_id,
@@ -78,19 +84,28 @@ class TaskStore:
                 return True
             return False
 
-    def _evict_old_tasks(self) -> None:
-        """Evict oldest completed/failed tasks to make room."""
+    def _evict_old_tasks(self) -> int:
+        """Evict oldest completed/failed tasks to make room.
+
+        Returns:
+            Number of tasks evicted.
+        """
         completed = [
             t for t in self._tasks.values()
             if t.state in (TaskState.COMPLETED, TaskState.FAILED, TaskState.CANCELLED)
         ]
         completed.sort(key=lambda t: t.updated_at)
 
-        # Remove oldest 20% of completed tasks
+        if not completed:
+            return 0
+
+        # Remove oldest 20% of completed tasks (at least 1)
         to_remove = completed[:max(1, len(completed) // 5)]
         for task in to_remove:
             del self._tasks[task.id]
             logger.debug(f"Evicted task {task.id}")
+
+        return len(to_remove)
 
 
 class TaskHandler:
@@ -222,6 +237,15 @@ class TaskHandler:
         task = self.store.get(task_id)
         if not task:
             raise ValueError(f"Task not found: {task_id}")
+
+        # Check if task is already in a terminal state
+        terminal_states = (TaskState.COMPLETED, TaskState.FAILED, TaskState.CANCELLED)
+        if task.state in terminal_states:
+            return {
+                "cancelled": False,
+                "reason": f"Task already in terminal state: {task.state.value}",
+                "task": task.to_dict(),
+            }
 
         # Signal cancellation
         if task_id in self._running_tasks:

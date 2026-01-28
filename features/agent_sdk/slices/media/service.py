@@ -11,6 +11,7 @@ Orchestrates media processing workflows:
 import logging
 import time
 from typing import Any, Dict, List, Optional
+from urllib.parse import urlparse
 
 from .models import (
     MediaArtifact,
@@ -141,12 +142,13 @@ class MediaService:
         if not self.http_client:
             return {"url": task.source_url, "local_path": None}
 
-        # Check if YouTube URL
-        if "youtube.com" in task.source_url or "youtu.be" in task.source_url:
+        # Check if YouTube URL using proper URL parsing
+        if self._is_youtube_url(task.source_url):
             try:
                 response = await self.http_client.post(
                     f"{self.yt_service_url}/ingest",
                     json={"url": task.source_url},
+                    timeout=60.0,  # 60 second timeout for ingestion
                 )
                 response.raise_for_status()
                 return response.json()
@@ -154,6 +156,19 @@ class MediaService:
                 logger.warning(f"YouTube ingestion failed: {e}")
 
         return {"url": task.source_url}
+
+    def _is_youtube_url(self, url: str) -> bool:
+        """Check if URL is a valid YouTube URL using proper URL parsing."""
+        try:
+            parsed = urlparse(url)
+            host = parsed.netloc.lower()
+            # Remove www. prefix if present
+            if host.startswith("www."):
+                host = host[4:]
+            # Check for exact YouTube domains
+            return host in ("youtube.com", "youtu.be", "m.youtube.com")
+        except Exception:
+            return False
 
     async def _ingest_audio(self, task: MediaTask) -> Dict:
         """Ingest audio from source URL."""
