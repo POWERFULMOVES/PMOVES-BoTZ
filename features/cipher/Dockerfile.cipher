@@ -46,6 +46,11 @@ COPY app_cipher_memory.py .
 # Create data directory for SQLite database
 RUN mkdir -p /data
 
+# Create non-root user
+RUN useradd -m -u 1000 -s /bin/bash appuser && \
+    chown -R appuser:appuser /app /data
+USER appuser
+
 # Set environment variables
 ENV PYTHONUNBUFFERED=1
 ENV MCP_MEMORY_DB_PATH=/data/memory.db

@@ -22,6 +22,11 @@ COPY gateway.py .
 # Install requests, PyYAML, and additional dependencies for health endpoint
 RUN pip install --break-system-packages requests pyyaml fastapi uvicorn
 
+# Create non-root user
+RUN adduser -D -u 1000 appuser && \
+    chown -R appuser:appuser /app
+USER appuser
+
 # Expose the port
 EXPOSE 2091
 
