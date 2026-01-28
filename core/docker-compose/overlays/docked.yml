@@ -1,0 +1,178 @@
+# =============================================================================
+# PMOVES-BoTZ Docker Compose Overlay: Docked Mode
+# =============================================================================
+# Use with: docker compose -f core/docker-compose/base.yml -f core/docker-compose/overlays/docked.yml up
+#
+# This overlay connects PMOVES-BoTZ to the parent PMOVES.AI cluster:
+# - Uses external networks (172.30.x.x) instead of internal (172.31.x.x)
+# - Routes LLM calls through parent TensorZero
+# - Publishes events to parent NATS
+# - Queries parent HiRAG for knowledge retrieval
+#
+# Reference: memory/expertise/pmoves_integration.yaml
+# Parent: https://github.com/POWERFULMOVES/PMOVES.AI
+# =============================================================================
+
+version: "3.9"
+
+services:
+  # ============================================================================
+  # MCP Gateway - Connects to parent NATS for cross-service coordination
+  # ============================================================================
+  mcp-gateway:
+    environment:
+      - PMOVES_DOCKED_MODE=true
+      - NATS_URL=${NATS_URL:-nats://nats:4222}
+      - TENSORZERO_BASE_URL=${TENSORZERO_BASE_URL:-http://tensorzero:3000}
+    networks:
+      - pmoves_api
+      - pmoves_app
+      - pmoves_bus  # NATS access
+      - pmoves_data
+
+  # ============================================================================
+  # Cipher Memory - Dual-write to parent storage
+  # ============================================================================
+  cipher-memory:
+    environment:
+      - PMOVES_DOCKED_MODE=true
+      # Use parent TensorZero for LLM inference
+      - TENSORZERO_BASE_URL=${TENSORZERO_BASE_URL:-http://tensorzero:3000}
+      - TENSORZERO_API_KEY=${TENSORZERO_API_KEY:-}
+      # NATS for memory event publishing
+      - NATS_URL=${NATS_URL:-nats://nats:4222}
+      - NATS_SUBJECT_PREFIX=botz.cipher
+    networks:
+      pmoves_data:
+        aliases: ["pmoves-botz_cipher", "cipher-memory"]
+      pmoves_bus: {}  # NATS access
+
+  # ============================================================================
+  # n8n Agent - Uses parent workflow service
+  # ============================================================================
+  n8n-agent:
+    environment:
+      - PMOVES_DOCKED_MODE=true
+      - N8N_API_URL=${N8N_API_URL:-http://n8n:5678/api/v1}
+      - TENSORZERO_BASE_URL=${TENSORZERO_BASE_URL:-http://tensorzero:3000}
+      - NATS_URL=${NATS_URL:-nats://nats:4222}
+    networks:
+      - pmoves_api
+      - pmoves_app
+      - pmoves_bus
+      - pmoves_data
+
+  # ============================================================================
+  # Docling MCP - Publishes document events to parent NATS
+  # ============================================================================
+  docling-mcp:
+    environment:
+      - PMOVES_DOCKED_MODE=true
+      - NATS_URL=${NATS_URL:-nats://nats:4222}
+      - NATS_SUBJECT_PREFIX=botz.docling
+    networks:
+      - pmoves_app
+      - pmoves_bus
+
+  # ============================================================================
+  # E2B Runner - Publishes code execution events to parent NATS
+  # ============================================================================
+  e2b-runner:
+    environment:
+      - PMOVES_DOCKED_MODE=true
+      - NATS_URL=${NATS_URL:-nats://nats:4222}  # For execution telemetry
+    networks:
+      - pmoves_api
+      - pmoves_bus
+
+  # ============================================================================
+  # VL Sentinel - Uses parent TensorZero for vision model routing
+  # ============================================================================
+  vl-sentinel:
+    environment:
+      - PMOVES_DOCKED_MODE=true
+      - TENSORZERO_BASE_URL=${TENSORZERO_BASE_URL:-http://tensorzero:3000}
+      # Fallback to parent Ollama if local unavailable
+      - OLLAMA_BASE_URL=${OLLAMA_BASE_URL:-http://ollama:11434}
+    networks:
+      - pmoves_app
+      - pmoves_bus
+
+  # ============================================================================
+  # TensorZero - Disabled in docked mode (use parent)
+  # ============================================================================
+  tensorzero:
+    deploy:
+      replicas: 0  # Don't run local TensorZero, use parent's
+
+  # ============================================================================
+  # Tailscale - Optional in docked mode (parent handles networking)
+  # ============================================================================
+  tailscale:
+    profiles:
+      - tailscale  # Only start if --profile tailscale specified
+
+  # ============================================================================
+  # Skills Library - Same in both modes
+  # ============================================================================
+  skills:
+    environment:
+      - PMOVES_DOCKED_MODE=true
+    networks:
+      - pmoves_app
+      - pmoves_bus
+
+  # ============================================================================
+  # Postman - Uses parent for API result storage
+  # ============================================================================
+  postman:
+    environment:
+      - PMOVES_DOCKED_MODE=true
+      - NATS_URL=${NATS_URL:-nats://nats:4222}
+    networks:
+      - pmoves_api
+      - pmoves_app
+      - pmoves_bus
+      - pmoves_data
+
+  # ============================================================================
+  # Hostinger - Same in both modes
+  # ============================================================================
+  hostinger:
+    environment:
+      - PMOVES_DOCKED_MODE=true
+
+  # ============================================================================
+  # YT Mini - Same in both modes
+  # ============================================================================
+  yt-mini:
+    environment:
+      - PMOVES_DOCKED_MODE=true
+
+# =============================================================================
+# External Networks (from PMOVES.AI parent)
+# =============================================================================
+# These networks must already exist in the parent docker-compose
+# Parent subnet scheme: 172.30.x.0/24 (vs local 172.31.x.0/24)
+
+networks:
+  pmoves_api:
+    external: true
+    name: pmoves_api
+
+  pmoves_app:
+    external: true
+    name: pmoves_app
+
+  pmoves_bus:
+    external: true
+    name: pmoves_bus
+
+  pmoves_data:
+    external: true
+    name: pmoves_data
+
+  # Monitoring can be internal or external
+  pmoves_monitoring:
+    external: true
+    name: pmoves_monitoring

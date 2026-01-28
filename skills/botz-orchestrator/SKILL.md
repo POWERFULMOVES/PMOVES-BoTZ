@@ -24,22 +24,63 @@ This skill enables the agent to act as the "Gateway" for the PMOVES-BoTZ system.
 
 ## Tools
 
-The following tools are available in the `tools/` directory:
+The orchestrator uses mprocs remote control to manage agents:
 
-| Tool | Description | Usage |
-|------|-------------|-------|
-| `spawn_agent.py` | Connects to mprocs and starts a new agent process | `uv run tools/spawn_agent.py --role builder --task "Fix API"` |
-| `log_thread.py` | Updates the `memory/threads.log` file | `uv run tools/log_thread.py --id <uuid> --status start` |
-| `read_expertise.py` | Searches expertise files for past solutions | `uv run tools/read_expertise.py --query "database migration"` |
-| `check_status.py` | Reads current swarm status | `uv run tools/check_status.py` |
+| Action | Method | Example |
+|--------|--------|---------|
+| Spawn agent | mprocs API | `curl http://127.0.0.1:4050/procs/builder/start` |
+| Stop agent | mprocs API | `curl http://127.0.0.1:4050/procs/builder/stop` |
+| Check status | Read file | `cat memory/status.md` |
+| Read expertise | Read files | `cat memory/expertise/*.yaml` |
+
+**Note:** Tools are implemented via mprocs remote control server at `127.0.0.1:4050`.
 
 ## Context Priming
 
 Before executing any orchestration task:
 1. Read `memory/architecture.md` for system context
 2. Check `memory/status.md` for active threads
-3. Review `security/patterns.yaml` for constraints
+3. Review `patterns.yaml` for security constraints
 4. Load relevant `memory/expertise/*.yaml` files
+
+### Dynamic Context Priming (Mode-Aware)
+
+The orchestrator adapts behavior based on deployment mode:
+
+```yaml
+# Detect mode
+mode: ${PMOVES_DOCKED_MODE:-standalone}
+
+# Load mode-specific context
+if mode == "docked":
+  # PMOVES.AI Integration Mode
+  load: memory/expertise/pmoves_integration.yaml
+  services:
+    llm: TensorZero (${TENSORZERO_BASE_URL})
+    knowledge: HiRAG (${HIRAG_URL})
+    events: NATS (${NATS_URL})
+    storage: Parent Supabase/Qdrant
+  publish_events: true
+  nats_prefix: "botz."
+
+else:  # standalone
+  # Local Development Mode
+  services:
+    llm: Ollama (${OLLAMA_HOST})
+    knowledge: Cipher Memory (stdio)
+    events: None (local only)
+    storage: Local volumes
+  publish_events: false
+```
+
+### Context Loading Priority
+
+1. **Security First**: Always load `patterns.yaml` regardless of mode
+2. **Mode Detection**: Check `PMOVES_DOCKED_MODE` environment variable
+3. **Integration Patterns**: Load `memory/expertise/pmoves_integration.yaml`
+4. **Code Patterns**: Load `memory/expertise/code_patterns.yaml`
+5. **Security Patterns**: Load `memory/expertise/security_patterns.yaml`
+6. **Status Check**: Read `memory/status.md` for thread conflicts
 
 ## Output Schema
 
@@ -62,10 +103,28 @@ thread_plan:
   validation: "<how to verify success>"
 ```
 
-## Cookbook (Progressive Disclosure)
+## Thread Patterns
 
-Refer to the `cookbook/` directory for detailed workflows:
+### Parallel Thread (P)
+Spawn multiple agents simultaneously via mprocs:
+```bash
+# Start builder and auditor in parallel
+curl http://127.0.0.1:4050/procs/builder/start &
+curl http://127.0.0.1:4050/procs/auditor/start &
+```
 
-- `cookbook/parallel_thread_pattern.md`: How to spin up multiple agents in parallel
-- `cookbook/chained_thread_pattern.md`: How to create sequential dependencies
-- `cookbook/consensus_review.md`: How to use Auditor to validate Builder output
+### Chained Thread (C)
+Sequential dependencies where one agent waits for another:
+```yaml
+thread_plan:
+  tasks:
+    - id: "build"
+      agent: "builder"
+      depends_on: []
+    - id: "review"
+      agent: "auditor"
+      depends_on: ["build"]
+```
+
+### Consensus Review
+Use Auditor to validate Builder output before committing.

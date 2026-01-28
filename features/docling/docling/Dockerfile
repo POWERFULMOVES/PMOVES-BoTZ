@@ -14,16 +14,21 @@ RUN pip install --no-cache-dir docling --extra-index-url https://download.pytorc
 ENV HF_HOME=/tmp/
 ENV TORCH_HOME=/tmp/
 
-COPY docs/examples/minimal.py /root/minimal.py
+COPY docs/examples/minimal.py /app/minimal.py
 
 RUN docling-tools models download
+
+# Create non-root user
+RUN useradd -m -u 1000 -s /bin/bash appuser && \
+    chown -R appuser:appuser /app
+USER appuser
 
 # On container environments, always set a thread budget to avoid undesired thread congestion.
 ENV OMP_NUM_THREADS=4
 
 # On container shell:
-# > cd /root/
+# > cd /app/
 # > python minimal.py
 
-# Running as `docker run -e DOCLING_ARTIFACTS_PATH=/root/.cache/docling/models` will use the
+# Running as `docker run -e DOCLING_ARTIFACTS_PATH=/home/appuser/.cache/docling/models` will use the
 # model weights included in the container image.
