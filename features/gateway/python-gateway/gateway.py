@@ -4,6 +4,10 @@ MCP Gateway - Unified tool routing for BoTZ agents.
 
 Routes tool calls to upstream MCP servers (n8n-agent, hostinger, cipher-memory,
 e2b, vl-sentinel, docling) via a single endpoint on port 2091.
+
+Also provides A2A (Agent-to-Agent) protocol endpoints:
+- GET /.well-known/agent.json - Agent capability discovery
+- POST /a2a/v1/tasks - JSON-RPC 2.0 task lifecycle management
 """
 
 import asyncio
@@ -19,6 +23,13 @@ from urllib.request import urlopen, Request
 from urllib.error import URLError
 
 import yaml
+
+# Import A2A module
+try:
+    from a2a import get_agent_card, TaskHandler
+    A2A_AVAILABLE = True
+except ImportError:
+    A2A_AVAILABLE = False
 
 # Configure logging
 logging.basicConfig(
@@ -204,9 +215,13 @@ class MCPGateway:
 
 
 class GatewayHTTPHandler(BaseHTTPRequestHandler):
-    """HTTP request handler for MCP Gateway."""
+    """HTTP request handler for MCP Gateway with A2A protocol support."""
 
     gateway = MCPGateway()
+
+    # A2A components (initialized in main)
+    a2a_task_handler: Optional['TaskHandler'] = None
+    a2a_enabled: bool = A2A_AVAILABLE
 
     def _send_json(self, status: int, data: Dict):
         """Send JSON response."""
@@ -226,12 +241,46 @@ class GatewayHTTPHandler(BaseHTTPRequestHandler):
 
     def do_GET(self):
         """Handle GET requests."""
+        # A2A Agent Card discovery endpoint
+        if self.path == '/.well-known/agent.json':
+            if self.a2a_enabled:
+                tools = self.gateway.get_all_tools()
+                card = get_agent_card(self.gateway.upstream_servers, tools)
+                self._send_json(200, card.to_dict())
+            else:
+                self._send_json(501, {"error": "A2A protocol not available"})
+            return
+
+        # A2A health check
+        if self.path == '/a2a/health' or self.path == '/a2a/v1/health':
+            self._send_json(200, {
+                "status": "healthy" if self.a2a_enabled else "unavailable",
+                "service": "A2A Protocol",
+                "version": "1.0.0",
+                "enabled": self.a2a_enabled,
+            })
+            return
+
+        # A2A task info (GET)
+        if self.path.startswith('/a2a/v1/tasks/') and self.a2a_task_handler:
+            task_id = self.path.split('/')[4]
+            result = self.a2a_task_handler.handle_jsonrpc({
+                "jsonrpc": "2.0",
+                "method": "tasks/get",
+                "params": {"task_id": task_id},
+                "id": 1,
+            })
+            status = 200 if "result" in result else 404
+            self._send_json(status, result)
+            return
+
         if self.path == '/health':
             self._send_json(200, {
                 "status": "healthy",
                 "service": "MCP Gateway",
                 "version": "2.0.0",
-                "upstream_servers": len(self.gateway.upstream_servers)
+                "upstream_servers": len(self.gateway.upstream_servers),
+                "a2a_enabled": self.a2a_enabled,
             })
 
         elif self.path == '/servers':
@@ -266,6 +315,16 @@ class GatewayHTTPHandler(BaseHTTPRequestHandler):
             data = json.loads(body)
         except json.JSONDecodeError:
             self._send_json(400, {"error": "Invalid JSON"})
+            return
+
+        # A2A JSON-RPC endpoint
+        if self.path == '/a2a/v1/tasks' or self.path == '/a2a/tasks':
+            if self.a2a_task_handler:
+                result = self.a2a_task_handler.handle_jsonrpc(data)
+                status = 200 if "result" in result else 400
+                self._send_json(status, result)
+            else:
+                self._send_json(501, {"error": "A2A protocol not available"})
             return
 
         if self.path == '/call':
@@ -320,12 +379,26 @@ class GatewayHTTPHandler(BaseHTTPRequestHandler):
 
 
 def main():
-    """Main entry point for MCP Gateway."""
+    """Main entry point for MCP Gateway with A2A support."""
     host = os.environ.get('HOST', '0.0.0.0')
     port = int(os.environ.get('PORT', '2091'))
 
     logger.info(f"Starting MCP Gateway on {host}:{port}")
     logger.info(f"Configured upstream servers: {list(MCP_UPSTREAM_SERVERS.keys())}")
+
+    # Initialize A2A if available
+    if A2A_AVAILABLE:
+        logger.info("A2A Protocol: Enabled")
+        logger.info("  - Agent Card: GET /.well-known/agent.json")
+        logger.info("  - Tasks API:  POST /a2a/v1/tasks")
+
+        # Create task handler with gateway's tool executor
+        gateway_instance = GatewayHTTPHandler.gateway
+        GatewayHTTPHandler.a2a_task_handler = TaskHandler(
+            tool_executor=gateway_instance.call_tool
+        )
+    else:
+        logger.warning("A2A Protocol: Disabled (module not found)")
 
     server = HTTPServer((host, port), GatewayHTTPHandler)
 
@@ -333,6 +406,8 @@ def main():
         server.serve_forever()
     except KeyboardInterrupt:
         logger.info("Shutting down MCP Gateway...")
+        if GatewayHTTPHandler.a2a_task_handler:
+            GatewayHTTPHandler.a2a_task_handler.shutdown()
         server.shutdown()
 
 
