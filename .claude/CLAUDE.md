@@ -31,6 +31,47 @@ Agent safety is enforced via `patterns.yaml` and the `hooks/` directory:
 
 **Run tests:** `python hooks/test_hooks.py`
 
+## Multi-Agent Orchestration
+
+PMOVES-BoTZ uses mprocs for multi-agent orchestration (`.mprocs.yaml`):
+
+```
+                    ┌─────────────────┐
+                    │   GATEWAY       │ (Entry Point)
+                    │   Task Dispatch │
+                    └────────┬────────┘
+                             │
+            ┌────────────────┼────────────────┐
+            │                │                │
+    ┌───────▼───────┐ ┌──────▼──────┐ ┌──────▼──────┐
+    │   ARCHITECT   │ │   BUILDER   │ │   AUDITOR   │
+    │   (Opus 4.5)  │ │  (Sonnet)   │ │  (Haiku)    │
+    │   Planning    │ │  Execution  │ │  Security   │
+    └───────────────┘ └─────────────┘ └─────────────┘
+```
+
+**Start Orchestration:**
+```bash
+mprocs                                    # Standalone mode
+mprocs --env PMOVES_DOCKED_MODE=true      # Docked mode
+```
+
+**Thread Types:**
+| Type | Description |
+|------|-------------|
+| Base (B) | Single prompt-response |
+| Parallel (P) | Multiple agents simultaneously |
+| Chained (C) | Sequential dependencies |
+| Fusion (F) | Multi-model consensus |
+| Zero Touch (Z) | Fully autonomous |
+
+**Memory & Expertise:**
+- `memory/architecture.md` - System architecture
+- `memory/status.md` - Current swarm state
+- `memory/expertise/code_patterns.yaml` - Learned patterns
+- `memory/expertise/security_patterns.yaml` - Security rules
+- `memory/expertise/pmoves_integration.yaml` - Docked/Standalone patterns
+
 ## MCP Server Catalog
 
 ### Document Processing
@@ -144,14 +185,46 @@ docker exec -i pmz-cipher python3 memory_shim/app_cipher_memory.py << 'EOF'
 EOF
 ```
 
+## Deployment Modes
+
+PMOVES-BoTZ supports two deployment modes:
+
+### Standalone Mode (Default)
+```bash
+# Start with local services
+docker compose -f core/docker-compose/base.yml -f core/docker-compose/overlays/development.yml up -d
+```
+- Uses local Ollama for LLM inference
+- Cipher Memory for knowledge storage
+- No external dependencies
+- Networks: `172.31.x.0/24` (internal)
+
+### Docked Mode (PMOVES.AI Integration)
+```bash
+# Start connected to parent cluster
+docker compose -f core/docker-compose/base.yml -f core/docker-compose/overlays/docked.yml up -d
+```
+- Connects to parent PMOVES.AI services
+- Uses TensorZero for LLM routing
+- Publishes events to NATS
+- Networks: `172.30.x.0/24` (external)
+
+**Mode Detection:** Set `PMOVES_DOCKED_MODE=true` environment variable
+
+**Reference:** `memory/expertise/pmoves_integration.yaml`
+
 ## Integration with PMOVES.AI
+
+### Parent Repository
+- **Repo:** https://github.com/POWERFULMOVES/PMOVES.AI
+- **Production Branch:** `PMOVES.AI-Edition-Hardened`
 
 ### Parent Repository Services
 BoTZ integrates with PMOVES.AI production services:
 
 | Service | Port | Use For |
 |---------|------|---------|
-| TensorZero | 3030 | LLM calls, embeddings |
+| TensorZero | 3000 | LLM calls, embeddings |
 | Hi-RAG v2 | 8086 | Knowledge retrieval |
 | NATS | 4222 | Event coordination |
 | Qdrant | 6333 | Vector storage |
@@ -159,9 +232,11 @@ BoTZ integrates with PMOVES.AI production services:
 
 ### NATS Event Subjects
 ```
-botz.mcp.tool.executed.v1     # MCP tool execution
-botz.cipher.memory.stored.v1  # Memory stored
+botz.mcp.tool.executed.v1      # MCP tool execution
+botz.cipher.memory.stored.v1   # Memory stored
 botz.cipher.memory.recalled.v1 # Memory recalled
+botz.gateway.task.dispatched.v1 # Gateway task dispatch
+botz.agent.thread.started.v1   # Agent thread lifecycle
 ```
 
 ## Adding New Features
