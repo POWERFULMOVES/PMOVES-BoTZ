@@ -40,6 +40,7 @@ from . import code_review
 from . import media
 from . import knowledge
 from . import a2a
+from . import geometry
 
 __all__ = [
     "register_slice",
@@ -50,4 +51,5 @@ __all__ = [
     "media",
     "knowledge",
     "a2a",
+    "geometry",
 ]
