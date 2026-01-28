@@ -178,7 +178,7 @@ nats_subjects:
 
 health_checks:
   standard:
-    endpoint: "/healthz"
+    endpoint: "/healthz"  # Most services; TensorZero uses /health
     method: "GET"
     interval: "30s"
     timeout: "5s"

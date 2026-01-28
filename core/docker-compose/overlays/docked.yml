@@ -75,12 +75,12 @@ services:
       - pmoves_bus
 
   # ============================================================================
-  # E2B Runner - Uses parent for code artifact storage
+  # E2B Runner - Publishes code execution events to parent NATS
   # ============================================================================
   e2b-runner:
     environment:
       - PMOVES_DOCKED_MODE=true
-      - NATS_URL=${NATS_URL:-nats://nats:4222}
+      - NATS_URL=${NATS_URL:-nats://nats:4222}  # For execution telemetry
     networks:
       - pmoves_api
       - pmoves_bus
