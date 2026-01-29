@@ -26,6 +26,22 @@ class TaskState(Enum):
     CANCELLED = "cancelled"      # Cancelled by client
 
 
+class MessageRole(Enum):
+    """Roles for messages within a task context."""
+    USER = "user"        # User/client message
+    AGENT = "agent"      # Agent response
+    SYSTEM = "system"    # System message
+
+
+class ArtifactType(Enum):
+    """Types of task output artifacts."""
+    TEXT = "text"        # Plain text output
+    CODE = "code"        # Code/source output
+    FILE = "file"        # File reference
+    JSON = "json"        # Structured JSON data
+    RESULT = "result"    # Generic result
+
+
 @dataclass
 class AgentCapability:
     """High-level capability of an agent."""
@@ -84,25 +100,33 @@ class AgentCard:
 @dataclass
 class TaskArtifact:
     """Output artifact from a completed task."""
-    type: str  # "text", "code", "file", "json"
+    type: str  # "text", "code", "file", "json", "result" (use ArtifactType enum values)
     content: Any
     name: Optional[str] = None
     mime_type: str = "text/plain"
 
     def to_dict(self) -> Dict[str, Any]:
-        return asdict(self)
+        result = asdict(self)
+        # Normalize type to string value if enum
+        if isinstance(self.type, ArtifactType):
+            result["type"] = self.type.value
+        return result
 
 
 @dataclass
 class TaskMessage:
     """Message within a task context."""
-    role: str  # "user", "agent", "system"
+    role: str  # "user", "agent", "system" (use MessageRole enum values)
     content: str
     timestamp: str = field(default_factory=lambda: datetime.utcnow().isoformat() + "Z")
     parts: List[Dict[str, Any]] = field(default_factory=list)
 
     def to_dict(self) -> Dict[str, Any]:
-        return asdict(self)
+        result = asdict(self)
+        # Normalize role to string value if enum
+        if isinstance(self.role, MessageRole):
+            result["role"] = self.role.value
+        return result
 
 
 @dataclass

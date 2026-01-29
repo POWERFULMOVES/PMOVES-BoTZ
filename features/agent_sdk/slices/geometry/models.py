@@ -176,6 +176,10 @@ class ConsensusVote:
     entropy_delta: float = 0.0  # Change in entropy from this vote
     timestamp: str = field(default_factory=lambda: datetime.utcnow().isoformat() + "Z")
 
+    def __post_init__(self):
+        """Validate and clamp vote to valid range."""
+        self.vote = max(-1.0, min(1.0, self.vote))
+
     def to_dict(self) -> Dict:
         return {
             "agent_id": self.agent_id,

@@ -14,8 +14,13 @@ import logging
 import time
 from dataclasses import dataclass
 from typing import Any, Callable, Dict, Generator, Optional
-from urllib.request import urlopen, Request
-from urllib.error import URLError, HTTPError
+
+try:
+    import httpx
+    HTTPX_AVAILABLE = True
+except ImportError:
+    HTTPX_AVAILABLE = False
+    httpx = None
 
 from .types import AgentCard, Task, TaskState, AgentCapability, AgentSkill
 
@@ -41,6 +46,8 @@ class RemoteAgent:
 class A2AClient:
     """
     A2A Protocol Client for calling remote agents.
+
+    Uses httpx for non-blocking HTTP requests.
 
     Usage:
         client = A2AClient()
@@ -68,8 +75,11 @@ class A2AClient:
         Args:
             timeout: Default timeout for HTTP requests in seconds
         """
+        if not HTTPX_AVAILABLE:
+            raise ImportError("httpx is required for A2AClient. Install with: pip install httpx")
         self.timeout = timeout
         self._agent_cache: Dict[str, RemoteAgent] = {}
+        self._client = httpx.Client(timeout=timeout)
 
     def discover(self, base_url: str, force_refresh: bool = False) -> RemoteAgent:
         """
@@ -98,9 +108,9 @@ class A2AClient:
         logger.info(f"Discovering agent at {card_url}")
 
         try:
-            req = Request(card_url, headers={"Accept": "application/json"})
-            with urlopen(req, timeout=self.timeout) as resp:
-                data = json.loads(resp.read().decode())
+            resp = self._client.get(card_url, headers={"Accept": "application/json"})
+            resp.raise_for_status()
+            data = resp.json()
 
             # Parse agent card
             card = AgentCard(
@@ -128,11 +138,11 @@ class A2AClient:
             logger.info(f"Discovered agent: {card.name} with {len(card.capabilities)} capabilities")
             return agent
 
-        except HTTPError as e:
-            logger.error(f"HTTP error discovering agent: {e.code} {e.reason}")
+        except httpx.HTTPStatusError as e:
+            logger.error(f"HTTP error discovering agent: {e.response.status_code}")
             raise
-        except URLError as e:
-            logger.error(f"Network error discovering agent: {e.reason}")
+        except httpx.RequestError as e:
+            logger.error(f"Network error discovering agent: {e}")
             raise
         except Exception as e:
             logger.exception(f"Error parsing agent card from {card_url}")
@@ -177,13 +187,13 @@ class A2AClient:
         logger.info(f"Creating task on {base_url} for skill {skill_id}")
 
         try:
-            req = Request(
+            resp = self._client.post(
                 tasks_url,
-                data=json.dumps(request_data).encode(),
+                json=request_data,
                 headers={"Content-Type": "application/json"},
             )
-            with urlopen(req, timeout=self.timeout) as resp:
-                result = json.loads(resp.read().decode())
+            resp.raise_for_status()
+            result = resp.json()
 
             if "error" in result:
                 raise ValueError(f"Task creation failed: {result['error']}")
@@ -198,11 +208,11 @@ class A2AClient:
             logger.info(f"Created task {task.id} with state {task.state.value}")
             return task
 
-        except HTTPError as e:
-            logger.error(f"HTTP error creating task: {e.code} {e.reason}")
+        except httpx.HTTPStatusError as e:
+            logger.error(f"HTTP error creating task: {e.response.status_code}")
             raise
-        except URLError as e:
-            logger.error(f"Network error creating task: {e.reason}")
+        except httpx.RequestError as e:
+            logger.error(f"Network error creating task: {e}")
             raise
 
     def get_task(self, task_id: str, agent_url: str) -> Task:
@@ -220,9 +230,9 @@ class A2AClient:
         task_url = f"{base_url}/a2a/v1/tasks/{task_id}"
 
         try:
-            req = Request(task_url, headers={"Accept": "application/json"})
-            with urlopen(req, timeout=self.timeout) as resp:
-                result = json.loads(resp.read().decode())
+            resp = self._client.get(task_url, headers={"Accept": "application/json"})
+            resp.raise_for_status()
+            result = resp.json()
 
             if "error" in result:
                 raise ValueError(f"Task not found: {result['error']}")
@@ -230,8 +240,8 @@ class A2AClient:
             task_data = result.get("result", result)
             return self._parse_task(task_data)
 
-        except HTTPError as e:
-            if e.code == 404:
+        except httpx.HTTPStatusError as e:
+            if e.response.status_code == 404:
                 raise ValueError(f"Task not found: {task_id}")
             raise
 
@@ -269,21 +279,21 @@ class A2AClient:
         }
 
         try:
-            req = Request(
+            resp = self._client.post(
                 tasks_url,
-                data=json.dumps(request_data).encode(),
+                json=request_data,
                 headers={"Content-Type": "application/json"},
             )
-            with urlopen(req, timeout=self.timeout) as resp:
-                result = json.loads(resp.read().decode())
+            resp.raise_for_status()
+            result = resp.json()
 
             if "error" in result:
                 raise ValueError(f"Send message failed: {result['error']}")
 
             return self._parse_task(result.get("result", {}))
 
-        except HTTPError as e:
-            logger.error(f"HTTP error sending message: {e.code} {e.reason}")
+        except httpx.HTTPStatusError as e:
+            logger.error(f"HTTP error sending message: {e.response.status_code}")
             raise
 
     def cancel_task(self, task_id: str, agent_url: str) -> Task:
@@ -308,21 +318,21 @@ class A2AClient:
         }
 
         try:
-            req = Request(
+            resp = self._client.post(
                 tasks_url,
-                data=json.dumps(request_data).encode(),
+                json=request_data,
                 headers={"Content-Type": "application/json"},
             )
-            with urlopen(req, timeout=self.timeout) as resp:
-                result = json.loads(resp.read().decode())
+            resp.raise_for_status()
+            result = resp.json()
 
             if "error" in result:
                 raise ValueError(f"Cancel failed: {result['error']}")
 
             return self._parse_task(result.get("result", {}).get("task", {}))
 
-        except HTTPError as e:
-            logger.error(f"HTTP error cancelling task: {e.code} {e.reason}")
+        except httpx.HTTPStatusError as e:
+            logger.error(f"HTTP error cancelling task: {e.response.status_code}")
             raise
 
     def wait_for_completion(
@@ -391,6 +401,7 @@ class A2AClient:
                 role=msg_data.get("role", "user"),
                 content=msg_data.get("content", ""),
                 timestamp=msg_data.get("timestamp", ""),
+                parts=msg_data.get("parts", []),
             ))
 
         for art_data in data.get("artifacts", []):

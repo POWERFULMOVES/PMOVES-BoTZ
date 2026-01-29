@@ -125,6 +125,7 @@ class KnowledgeService:
                     "mode": task.retrieval_mode.value,
                     "filters": task.filters,
                 },
+                timeout=60.0,
             )
             response.raise_for_status()
             data = response.json()
@@ -208,12 +209,18 @@ class KnowledgeService:
             )
 
         try:
+            # Extract document IDs, guarding against None documents
+            doc_ids = []
+            if task.documents:
+                doc_ids = [d.get("id") for d in task.documents if d.get("id")]
+
             response = await self.http_client.post(
                 f"{self.hirag_url}/hirag/delete",
                 json={
                     "filters": task.filters,
-                    "document_ids": [d.get("id") for d in task.documents if d.get("id")],
+                    "document_ids": doc_ids,
                 },
+                timeout=60.0,
             )
             response.raise_for_status()
             data = response.json()
@@ -274,24 +281,25 @@ class KnowledgeService:
         }
 
         if not self.http_client:
+            logger.warning("Health check skipped: HTTP client not configured")
             return status
 
         try:
-            resp = await self.http_client.get(f"{self.hirag_url}/health")
+            resp = await self.http_client.get(f"{self.hirag_url}/health", timeout=5.0)
             status["hirag"] = resp.status_code == 200
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug(f"Hi-RAG health check failed: {e}")
 
         try:
-            resp = await self.http_client.get(f"{self.qdrant_url}/health")
+            resp = await self.http_client.get(f"{self.qdrant_url}/health", timeout=5.0)
             status["qdrant"] = resp.status_code == 200
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug(f"Qdrant health check failed: {e}")
 
         try:
-            resp = await self.http_client.get(f"{self.meilisearch_url}/health")
+            resp = await self.http_client.get(f"{self.meilisearch_url}/health", timeout=5.0)
             status["meilisearch"] = resp.status_code == 200
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug(f"Meilisearch health check failed: {e}")
 
         return status

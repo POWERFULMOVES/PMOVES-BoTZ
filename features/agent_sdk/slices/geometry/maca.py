@@ -216,10 +216,15 @@ class MACAConsensus:
         final_packet.calculate_entropy()
 
         # Calculate entropy metric
+        # convergence_rate = entropy reduction per round (higher = faster convergence)
+        rounds = self._round_counts.get(packet_id, 1)
+        entropy_delta = initial_entropy - final_packet.entropy
+        convergence_rate = entropy_delta / rounds if rounds > 0 else 0.0
+
         entropy_metric = EntropyMetric(
             initial_entropy=initial_entropy,
             final_entropy=final_packet.entropy,
-            convergence_rate=len(votes) / self._round_counts.get(packet_id, 1),
+            convergence_rate=convergence_rate,
             participants=len(set(v.agent_id for v in votes)),
         )
 
@@ -315,16 +320,26 @@ class MACAConsensus:
 
         # Apply weighted average of transformations
         total_weight = sum(w for _, w in weighted_transforms)
+        if total_weight == 0:
+            return result
+
         for transform, weight in weighted_transforms:
             # Weight the transformation strength
             scaled_transform = {}
+            weight_factor = weight / total_weight
             for key, value in transform.items():
                 if isinstance(value, (int, float)):
                     # Interpolate toward transformation based on weight
                     if key == "scale":
-                        scaled_transform[key] = 1 + (value - 1) * (weight / total_weight)
+                        scaled_transform[key] = 1 + (value - 1) * weight_factor
                     else:
-                        scaled_transform[key] = value * (weight / total_weight)
+                        scaled_transform[key] = value * weight_factor
+                elif isinstance(value, (list, tuple)):
+                    # Scale vector components (e.g., translation offsets)
+                    scaled_transform[key] = type(value)(
+                        v * weight_factor if isinstance(v, (int, float)) else v
+                        for v in value
+                    )
                 else:
                     scaled_transform[key] = value
 

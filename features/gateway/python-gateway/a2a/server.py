@@ -17,8 +17,15 @@ import os
 import queue
 import threading
 import time
-from http.server import HTTPServer, BaseHTTPRequestHandler
+from http.server import BaseHTTPRequestHandler
+from socketserver import ThreadingMixIn
 from typing import Any, Callable, Dict, Optional
+import http.server
+
+
+class ThreadingHTTPServer(ThreadingMixIn, http.server.HTTPServer):
+    """HTTP Server that handles requests in separate threads for SSE support."""
+    daemon_threads = True
 
 from .agent_card import get_agent_card
 from .task_handler import TaskHandler
@@ -199,8 +206,11 @@ class A2AHTTPHandler(BaseHTTPRequestHandler):
             event = f"event: {event_type}\ndata: {json.dumps(data)}\n\n"
             self.wfile.write(event.encode())
             self.wfile.flush()
-        except Exception:
-            pass
+        except (BrokenPipeError, ConnectionResetError):
+            # Client disconnected - expected during SSE streaming
+            raise
+        except Exception as e:
+            logger.warning(f"SSE write failed for event {event_type}: {e}")
 
     def log_message(self, format: str, *args) -> None:
         """Log HTTP requests."""
@@ -212,9 +222,9 @@ def create_a2a_server(
     port: int = 7000,
     tool_executor: Optional[Callable[[str, Dict], Dict]] = None,
     upstream_servers: Optional[Dict] = None,
-) -> HTTPServer:
+) -> ThreadingHTTPServer:
     """
-    Create an A2A HTTP server.
+    Create an A2A HTTP server with threading support for SSE.
 
     Args:
         host: Bind address
@@ -223,7 +233,7 @@ def create_a2a_server(
         upstream_servers: Dict of upstream MCP servers for agent card
 
     Returns:
-        Configured HTTPServer instance
+        Configured ThreadingHTTPServer instance
     """
     # Configure handler
     if tool_executor:
@@ -234,8 +244,8 @@ def create_a2a_server(
             return get_agent_card(upstream_servers).to_dict()
         A2AHTTPHandler.agent_card_provider = card_provider
 
-    server = HTTPServer((host, port), A2AHTTPHandler)
-    logger.info(f"A2A Server configured on {host}:{port}")
+    server = ThreadingHTTPServer((host, port), A2AHTTPHandler)
+    logger.info(f"A2A Server configured on {host}:{port} (threaded)")
     return server
 
 

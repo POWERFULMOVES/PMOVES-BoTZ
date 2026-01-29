@@ -18,6 +18,12 @@ class SourceType(Enum):
     SUPASERCH = "supaserch"
     DEEP_RESEARCH = "deep_research"
     DOCUMENT = "document"
+    UNKNOWN = "unknown"  # Fallback for unrecognized source types
+
+    @classmethod
+    def _missing_(cls, value: object) -> "SourceType":  # noqa: ARG003
+        """Handle unknown source type values gracefully."""
+        return cls.UNKNOWN
 
 
 class ConfidenceLevel(Enum):
@@ -26,6 +32,13 @@ class ConfidenceLevel(Enum):
     MEDIUM = "medium"      # Single authoritative source
     LOW = "low"            # Extrapolation or inference
     UNCERTAIN = "uncertain"
+
+
+class ResearchDepth(Enum):
+    """Depth levels for research tasks."""
+    SHALLOW = "shallow"    # Quick lookup, limited sources
+    STANDARD = "standard"  # Normal research, balanced depth
+    DEEP = "deep"          # Comprehensive research, all sources
 
 
 @dataclass
@@ -56,7 +69,7 @@ class ResearchTask:
     """A research task specification."""
     id: str = field(default_factory=lambda: str(uuid.uuid4()))
     query: str = ""
-    depth: str = "standard"  # shallow, standard, deep
+    depth: ResearchDepth = ResearchDepth.STANDARD
     sources: List[SourceType] = field(default_factory=lambda: [SourceType.HIRAG, SourceType.WEB_SEARCH])
     max_sources: int = 10
     include_citations: bool = True
@@ -67,7 +80,7 @@ class ResearchTask:
         return {
             "id": self.id,
             "query": self.query,
-            "depth": self.depth,
+            "depth": self.depth.value,
             "sources": [s.value for s in self.sources],
             "max_sources": self.max_sources,
             "include_citations": self.include_citations,

@@ -87,15 +87,19 @@ class CHITMessage:
             payload_type=parts[3] if len(parts) > 3 else "geometry",
         )
 
-        # Decode anchor
+        # Decode anchor (guard against malformed/truncated payloads)
         if len(parts) > 4 and parts[4]:
-            coords = [int(c) / 1000 for c in parts[4].split(",") if c]
-            coeffs = [int(c) / 1000 for c in parts[5].split(",") if c and len(parts) > 5]
-            msg.anchor = AnchorVector(
-                coordinates=coords,
-                coefficients=coeffs,
-                dimension=len(coords),
-            )
+            try:
+                coords = [int(c) / 1000 for c in parts[4].split(",") if c]
+                coeffs_part = parts[5] if len(parts) > 5 else ""
+                coeffs = [int(c) / 1000 for c in coeffs_part.split(",") if c]
+                msg.anchor = AnchorVector(
+                    coordinates=coords,
+                    coefficients=coeffs,
+                    dimension=len(coords),
+                )
+            except (ValueError, IndexError) as e:
+                logger.warning(f"Malformed CHIT payload, skipping anchor: {e}")
 
         msg.compressed_size = len(data)
         return msg
@@ -235,6 +239,9 @@ class CHITBus:
 
             await self.nats_client.subscribe(subject, cb=nats_handler)
             logger.info(f"Subscribed to CHIT subject: {subject}")
+        else:
+            # Local mode: handlers are stored and invoked directly via publish_local
+            logger.info(f"Subscribed to CHIT subject (local mode): {subject}")
 
     def reconstruct_packet(
         self,
@@ -299,6 +306,36 @@ class CHITBus:
             self._cache.pop(pid, None)
             self._cache_timestamps.pop(pid, None)
 
+    async def publish_local(
+        self,
+        packet: GeometryPacket,
+        subject: str = "chit.geometry.v1",
+    ) -> CHITMessage:
+        """
+        Publish a geometry packet locally (no NATS).
+
+        Dispatches directly to subscribed handlers in local mode.
+
+        Args:
+            packet: GeometryPacket to publish
+            subject: Subject for routing to handlers
+
+        Returns:
+            CHITMessage that was created
+        """
+        message = await self.publish(packet, subject)
+
+        # Dispatch to local handlers if no NATS
+        if not self.nats_client and subject in self._handlers:
+            for handler in self._handlers[subject]:
+                try:
+                    handler(message)
+                    self._messages_received += 1
+                except Exception as e:
+                    logger.error(f"Error in local CHIT handler: {e}")
+
+        return message
+
     def get_stats(self) -> Dict:
         """Get bus statistics."""
         return {
@@ -316,24 +353,50 @@ def create_chit_bus(
     nats_url: Optional[str] = None,
 ) -> CHITBus:
     """
-    Create a CHIT Bus instance.
+    Create a CHIT Bus instance (sync factory, local-only).
+
+    For distributed messaging with NATS, use create_chit_bus_async() instead.
+
+    Args:
+        agent_id: Agent identifier
+        nats_url: Optional NATS URL (logged for info, but connection requires async)
+
+    Returns:
+        CHITBus instance in local mode
+    """
+    if nats_url:
+        logger.info(
+            f"CHIT Bus configured for NATS at {nats_url}. "
+            "Use create_chit_bus_async() for actual NATS connection."
+        )
+
+    return CHITBus(agent_id=agent_id, nats_client=None)
+
+
+async def create_chit_bus_async(
+    agent_id: str,
+    nats_url: Optional[str] = None,
+) -> CHITBus:
+    """
+    Create a CHIT Bus instance with NATS connection (async factory).
 
     Args:
         agent_id: Agent identifier
         nats_url: Optional NATS URL for distributed messaging
 
     Returns:
-        Configured CHITBus instance
+        Configured CHITBus instance with active NATS connection
     """
     nats_client = None
 
-    # Initialize NATS if URL provided
     if nats_url:
         try:
             import nats
-            # Note: Connection should be done async
-            logger.info(f"CHIT Bus configured with NATS: {nats_url}")
+            nats_client = await nats.connect(nats_url)
+            logger.info(f"CHIT Bus connected to NATS: {nats_url}")
         except ImportError:
-            logger.warning("NATS not available - CHIT Bus running in local mode")
+            logger.warning("NATS package not installed - running in local mode")
+        except Exception as e:
+            logger.warning(f"NATS connection failed ({e}) - running in local mode")
 
     return CHITBus(agent_id=agent_id, nats_client=nats_client)

@@ -8,11 +8,12 @@ Security-focused code analysis with OWASP Top 10 coverage:
 - Input validation problems
 """
 
+import inspect
 import logging
 import re
 import time
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional, Union
 
 from .models import (
     FindingCategory,
@@ -66,12 +67,13 @@ class CodeReviewService:
         print(f"Found {result.critical_count} critical issues")
     """
 
-    def __init__(self, file_reader: Optional[callable] = None):
+    def __init__(self, file_reader: Optional[Callable[[str], Union[str, Any]]] = None):
         """
         Initialize Code Review Service.
 
         Args:
-            file_reader: Optional async function to read files (default: sync read)
+            file_reader: Optional sync or async function to read files (default: sync read).
+                         If async, will be awaited automatically.
         """
         self.file_reader = file_reader or self._default_file_reader
 
@@ -79,7 +81,8 @@ class CodeReviewService:
         """Default sync file reader."""
         try:
             return Path(path).read_text(encoding="utf-8", errors="ignore")
-        except Exception:
+        except Exception as e:
+            logger.warning(f"Failed to read file {path}: {e}")
             return ""
 
     async def execute(self, task: ReviewTask) -> ReviewResult:
@@ -105,7 +108,13 @@ class CodeReviewService:
                     break
 
                 try:
+                    # Support both sync and async file readers
                     content = self.file_reader(file_path)
+                    if inspect.isawaitable(content):
+                        content = await content
+                    if not content:
+                        logger.debug(f"Skipping empty or unreadable file: {file_path}")
+                        continue
                     findings = self._analyze_file(file_path, content, task.focus_areas)
                     all_findings.extend(findings)
                     files_reviewed += 1
@@ -145,6 +154,8 @@ class CodeReviewService:
                 files.append(str(p))
         elif p.is_dir():
             for ext in extensions:
+                if len(files) >= max_files:
+                    break
                 for f in p.rglob(f"*{ext}"):
                     if len(files) >= max_files:
                         break
