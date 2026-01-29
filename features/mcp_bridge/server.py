@@ -320,13 +320,33 @@ async def run_http_server(server: MCPServer, host: str = "0.0.0.0", port: int = 
 
     async def handle_health(request: web.Request) -> web.Response:
         """Health check endpoint."""
-        return web.json_response({
-            "status": "healthy",
-            "server": server.name,
-            "version": server.version,
-            "tools_count": len(server.tools),
-            "prometheus_enabled": PROMETHEUS_AVAILABLE,
-        })
+        # Import here to avoid import errors if module not available
+        try:
+            from .utils.integration_health import IntegrationHealth
+            health_check = IntegrationHealth()
+            integrations = await health_check.get_status()
+
+            all_healthy = all(integration["healthy"] for integration in integrations.values())
+            status = "healthy" if all_healthy else "degraded"
+
+            return web.json_response({
+                "status": status,
+                "server": server.name,
+                "version": server.version,
+                "tools_count": len(server.tools),
+                "prometheus_enabled": PROMETHEUS_AVAILABLE,
+                "integrations": integrations,
+            })
+        except Exception as e:
+            # If integration health checks fail, return degraded status
+            return web.json_response({
+                "status": "degraded",
+                "server": server.name,
+                "version": server.version,
+                "tools_count": len(server.tools),
+                "prometheus_enabled": PROMETHEUS_AVAILABLE,
+                "error": f"Integration health check failed: {str(e)}",
+            })
 
     async def handle_metrics(_request: web.Request) -> web.Response:
         """Prometheus metrics endpoint."""
@@ -352,6 +372,19 @@ async def run_http_server(server: MCPServer, host: str = "0.0.0.0", port: int = 
 
     print(f"PMOVES MCP Server running at http://{host}:{port}")
     print(f"Tools available: {len(server.tools)}")
+
+    # Check integration health at startup
+    try:
+        from .utils.integration_health import IntegrationHealth
+        health_check = IntegrationHealth()
+        integrations = await health_check.get_status()
+
+        print("[STARTUP] Integration Status:")
+        for name, status in integrations.items():
+            health_str = "✓" if status["healthy"] else "✗"
+            print(f"  {health_str} {name}: {status['url']}")
+    except Exception as e:
+        print(f"[STARTUP] Integration health check failed: {e}")
 
     # Keep running
     await asyncio.Event().wait()
