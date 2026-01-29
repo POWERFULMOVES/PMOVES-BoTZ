@@ -17,7 +17,7 @@ procs:
       echo "=== PMOVES-BoTZ Environment Check ==="
       if [ "${PMOVES_DOCKED_MODE}" = "true" ]; then
         echo "Mode: DOCKED (connected to PMOVES.AI)"
-        echo "TensorZero: ${TENSORZERO_BASE_URL:-http://tensorzero:3000}"
+        echo "TensorZero: ${TENSORZERO_BASE_URL:-http://tensorzero-gateway:3030}"
         echo "NATS: ${NATS_URL:-nats://nats:4222}"
         echo "HiRAG: ${HIRAG_URL:-http://hirag:8086}"
       else
@@ -193,7 +193,7 @@ procs:
       echo "=== Health Check ==="
       if [ "${PMOVES_DOCKED_MODE}" = "true" ]; then
         echo "Checking docked dependencies..."
-        curl -sf ${TENSORZERO_BASE_URL:-http://tensorzero:3000}/health && echo "TensorZero: OK" || echo "TensorZero: FAIL"
+        curl -sf ${TENSORZERO_BASE_URL:-http://tensorzero-gateway:3030}/health && echo "TensorZero: OK" || echo "TensorZero: FAIL"
         curl -sf ${HIRAG_URL:-http://hirag:8086}/healthz && echo "HiRAG: OK" || echo "HiRAG: FAIL (optional)"
       else
         echo "Checking standalone dependencies..."
