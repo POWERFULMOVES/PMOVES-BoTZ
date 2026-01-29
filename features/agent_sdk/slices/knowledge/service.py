@@ -125,6 +125,7 @@ class KnowledgeService:
                     "mode": task.retrieval_mode.value,
                     "filters": task.filters,
                 },
+                timeout=60.0,
             )
             response.raise_for_status()
             data = response.json()
@@ -208,11 +209,16 @@ class KnowledgeService:
             )
 
         try:
+            # Extract document IDs, guarding against None documents
+            doc_ids = []
+            if task.documents:
+                doc_ids = [d.get("id") for d in task.documents if d.get("id")]
+
             response = await self.http_client.post(
                 f"{self.hirag_url}/hirag/delete",
                 json={
                     "filters": task.filters,
-                    "document_ids": [d.get("id") for d in task.documents if d.get("id")],
+                    "document_ids": doc_ids,
                 },
                 timeout=60.0,
             )

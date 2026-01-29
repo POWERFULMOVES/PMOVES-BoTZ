@@ -59,7 +59,7 @@ for finding in result.findings:
 - **DEPENDENCY**: Vulnerable dependencies (A06:2021) *
 
 > \* Categories marked with asterisk are placeholders for future implementation.
-> Currently, pattern-based detection focuses on INJECTION, SECRETS, and CRYPTO.
+> Currently, pattern-based detection focuses on INJECTION, SECRETS, VALIDATION, and CRYPTO.
 
 ## Pattern-Based Detection
 

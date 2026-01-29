@@ -154,6 +154,8 @@ class CodeReviewService:
                 files.append(str(p))
         elif p.is_dir():
             for ext in extensions:
+                if len(files) >= max_files:
+                    break
                 for f in p.rglob(f"*{ext}"):
                     if len(files) >= max_files:
                         break

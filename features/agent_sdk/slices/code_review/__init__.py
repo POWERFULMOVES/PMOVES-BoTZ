@@ -7,7 +7,7 @@ This vertical slice encapsulates all code review functionality:
 - models.py: Review data structures
 - SKILL.md: Agent context for code review
 
-Use: from slices.code_review import CodeReviewService
+Use: from features.agent_sdk.slices.code_review import CodeReviewService
 """
 
 from .models import FindingCategory, ReviewResult, ReviewTask, SecurityFinding, Severity

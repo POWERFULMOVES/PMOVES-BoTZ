@@ -306,6 +306,36 @@ class CHITBus:
             self._cache.pop(pid, None)
             self._cache_timestamps.pop(pid, None)
 
+    async def publish_local(
+        self,
+        packet: GeometryPacket,
+        subject: str = "chit.geometry.v1",
+    ) -> CHITMessage:
+        """
+        Publish a geometry packet locally (no NATS).
+
+        Dispatches directly to subscribed handlers in local mode.
+
+        Args:
+            packet: GeometryPacket to publish
+            subject: Subject for routing to handlers
+
+        Returns:
+            CHITMessage that was created
+        """
+        message = await self.publish(packet, subject)
+
+        # Dispatch to local handlers if no NATS
+        if not self.nats_client and subject in self._handlers:
+            for handler in self._handlers[subject]:
+                try:
+                    handler(message)
+                    self._messages_received += 1
+                except Exception as e:
+                    logger.error(f"Error in local CHIT handler: {e}")
+
+        return message
+
     def get_stats(self) -> Dict:
         """Get bus statistics."""
         return {

@@ -21,7 +21,7 @@ class SourceType(Enum):
     UNKNOWN = "unknown"  # Fallback for unrecognized source types
 
     @classmethod
-    def _missing_(cls, value: object) -> "SourceType":
+    def _missing_(cls, value: object) -> "SourceType":  # noqa: ARG003
         """Handle unknown source type values gracefully."""
         return cls.UNKNOWN
 

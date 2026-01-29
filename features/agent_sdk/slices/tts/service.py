@@ -196,6 +196,7 @@ class TTSService:
         if not self.http_client:
             return TTSResult(
                 request_id=request.id,
+                engine_used=TTSEngine.VIBEVOICE,
                 error="HTTP client not configured",
             )
 
@@ -205,6 +206,7 @@ class TTSService:
             if not vibevoice_url:
                 return TTSResult(
                     request_id=request.id,
+                    engine_used=TTSEngine.VIBEVOICE,
                     error="VIBEVOICE engine URL not configured",
                 )
 
@@ -229,6 +231,7 @@ class TTSService:
             logger.error(f"Multi-speaker TTS failed: {e}")
             return TTSResult(
                 request_id=request.id,
+                engine_used=TTSEngine.VIBEVOICE,
                 error=str(e),
                 processing_time_ms=int((time.time() - start_time) * 1000),
             )
