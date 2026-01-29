@@ -13,7 +13,7 @@ import time
 from typing import Any, Dict, List, Optional
 
 from .models import (
-    DEFAULT_VOICES,
+    _create_default_voices,
     EmotionStyle,
     MultiSpeakerRequest,
     MultiSpeakerSegment,
@@ -83,7 +83,8 @@ class TTSService:
         self.openai_api_key = openai_api_key
 
         # Voice configurations (can be customized)
-        self.voices: Dict[VoicePersona, VoiceConfig] = dict(DEFAULT_VOICES)
+        # Use factory function to get fresh copies, avoiding shared mutable state
+        self.voices: Dict[VoicePersona, VoiceConfig] = _create_default_voices()
 
     async def synthesize(
         self,
@@ -142,6 +143,7 @@ class TTSService:
             else:
                 result = TTSResult(
                     request_id=request.id,
+                    engine_used=tts_engine,
                     error=f"Unsupported engine: {tts_engine}",
                 )
 
@@ -183,6 +185,13 @@ class TTSService:
         )
 
         logger.info(f"Multi-speaker TTS request {request.id}: {len(segments)} segments")
+
+        if not segments:
+            return TTSResult(
+                request_id=request.id,
+                engine_used=TTSEngine.VIBEVOICE,
+                error="No segments provided for multi-speaker synthesis",
+            )
 
         if not self.http_client:
             return TTSResult(
@@ -353,7 +362,7 @@ class TTSService:
                 },
                 json={
                     "text": request.text,
-                    "model_id": "eleven_monolingual_v1",
+                    "model_id": "eleven_multilingual_v2",
                     "voice_settings": {
                         "stability": 0.5,
                         "similarity_boost": 0.75,

@@ -7,7 +7,7 @@ This vertical slice encapsulates all research functionality:
 - models.py: Research data structures
 - SKILL.md: Agent context for research tasks
 
-Use: from slices.research import ResearchService
+Use: from features.agent_sdk.slices.research import ResearchService
 """
 
 from .models import (

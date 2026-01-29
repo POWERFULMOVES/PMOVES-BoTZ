@@ -189,53 +189,65 @@ class MultiSpeakerRequest:
         }
 
 
+def _default_punctuation_rules() -> List[PunctuationRule]:
+    """Create fresh punctuation rules to avoid sharing mutable state."""
+    return [
+        PunctuationRule(
+            pattern="...",
+            replacement="<break time='600ms'/>",
+            pause_ms=600,
+            description="Long pause (approx 600ms)",
+        ),
+        PunctuationRule(
+            pattern="—",
+            replacement="<break time='300ms'/>",
+            pause_ms=300,
+            description="Sharp break/Tone shift",
+        ),
+        PunctuationRule(
+            pattern=",",
+            replacement="<break time='150ms'/>",
+            pause_ms=150,
+            description="Short breath",
+        ),
+    ]
+
+
 # Default punctuation rules for KOKORO (Host persona)
-DEFAULT_PUNCTUATION_RULES = [
-    PunctuationRule(
-        pattern="...",
-        replacement="<break time='600ms'/>",
-        pause_ms=600,
-        description="Long pause (approx 600ms)",
-    ),
-    PunctuationRule(
-        pattern="—",
-        replacement="<break time='300ms'/>",
-        pause_ms=300,
-        description="Sharp break/Tone shift",
-    ),
-    PunctuationRule(
-        pattern=",",
-        replacement="<break time='150ms'/>",
-        pause_ms=150,
-        description="Short breath",
-    ),
-]
+# Use _default_punctuation_rules() to get a fresh copy
+DEFAULT_PUNCTUATION_RULES = _default_punctuation_rules()
+
+
+def _create_default_voices() -> Dict[VoicePersona, VoiceConfig]:
+    """Create fresh default voice configurations to avoid sharing mutable state."""
+    return {
+        VoicePersona.HOST: VoiceConfig(
+            name="PMOVES Host",
+            persona=VoicePersona.HOST,
+            engine=TTSEngine.KOKORO,
+            emotion=EmotionStyle.WARM,
+            speed=0.95,
+            punctuation_rules=_default_punctuation_rules(),
+        ),
+        VoicePersona.ARCHITECT: VoiceConfig(
+            name="PMOVES Architect",
+            persona=VoicePersona.ARCHITECT,
+            engine=TTSEngine.FISH_SPEECH,
+            emotion=EmotionStyle.EXCITED,
+            speed=1.2,
+            reference_text="This is the fastest CPU we have ever tested and it is absolutely mind blowing.",
+        ),
+        VoicePersona.OPS: VoiceConfig(
+            name="PMOVES Ops",
+            persona=VoicePersona.OPS,
+            engine=TTSEngine.INDEXTTS2,
+            emotion=EmotionStyle.AUTHORITATIVE,
+            pitch=0.9,
+            speed=0.9,
+        ),
+    }
 
 
 # Default voice configurations for PMOVES.AI personas
-DEFAULT_VOICES = {
-    VoicePersona.HOST: VoiceConfig(
-        name="PMOVES Host",
-        persona=VoicePersona.HOST,
-        engine=TTSEngine.KOKORO,
-        emotion=EmotionStyle.WARM,
-        speed=0.95,
-        punctuation_rules=DEFAULT_PUNCTUATION_RULES,
-    ),
-    VoicePersona.ARCHITECT: VoiceConfig(
-        name="PMOVES Architect",
-        persona=VoicePersona.ARCHITECT,
-        engine=TTSEngine.FISH_SPEECH,
-        emotion=EmotionStyle.EXCITED,
-        speed=1.2,
-        reference_text="This is the fastest CPU we have ever tested and it is absolutely mind blowing.",
-    ),
-    VoicePersona.OPS: VoiceConfig(
-        name="PMOVES Ops",
-        persona=VoicePersona.OPS,
-        engine=TTSEngine.INDEXTTS2,
-        emotion=EmotionStyle.AUTHORITATIVE,
-        pitch=0.9,
-        speed=0.9,
-    ),
-}
+# Use _create_default_voices() to get a fresh copy in service initialization
+DEFAULT_VOICES = _create_default_voices()

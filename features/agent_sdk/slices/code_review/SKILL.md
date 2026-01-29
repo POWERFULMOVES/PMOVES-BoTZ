@@ -51,12 +51,15 @@ for finding in result.findings:
 ### Finding Categories (OWASP-aligned)
 
 - **INJECTION**: SQL, XSS, Command injection (A03:2021)
-- **AUTH**: Authentication/authorization issues (A07:2021)
+- **AUTH**: Authentication/authorization issues (A07:2021) *
 - **SECRETS**: Exposed credentials (A02:2021)
 - **VALIDATION**: Input validation (A03:2021)
 - **CRYPTO**: Weak cryptography (A02:2021)
-- **CONFIG**: Security misconfig (A05:2021)
-- **DEPENDENCY**: Vulnerable dependencies (A06:2021)
+- **CONFIG**: Security misconfig (A05:2021) *
+- **DEPENDENCY**: Vulnerable dependencies (A06:2021) *
+
+> \* Categories marked with asterisk are placeholders for future implementation.
+> Currently, pattern-based detection focuses on INJECTION, SECRETS, and CRYPTO.
 
 ## Pattern-Based Detection
 

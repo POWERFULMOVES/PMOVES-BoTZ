@@ -206,8 +206,11 @@ class A2AHTTPHandler(BaseHTTPRequestHandler):
             event = f"event: {event_type}\ndata: {json.dumps(data)}\n\n"
             self.wfile.write(event.encode())
             self.wfile.flush()
-        except Exception:
-            pass
+        except (BrokenPipeError, ConnectionResetError):
+            # Client disconnected - expected during SSE streaming
+            raise
+        except Exception as e:
+            logger.warning(f"SSE write failed for event {event_type}: {e}")
 
     def log_message(self, format: str, *args) -> None:
         """Log HTTP requests."""

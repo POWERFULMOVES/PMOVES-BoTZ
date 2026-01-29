@@ -87,15 +87,19 @@ class CHITMessage:
             payload_type=parts[3] if len(parts) > 3 else "geometry",
         )
 
-        # Decode anchor
+        # Decode anchor (guard against malformed/truncated payloads)
         if len(parts) > 4 and parts[4]:
-            coords = [int(c) / 1000 for c in parts[4].split(",") if c]
-            coeffs = [int(c) / 1000 for c in parts[5].split(",") if c and len(parts) > 5]
-            msg.anchor = AnchorVector(
-                coordinates=coords,
-                coefficients=coeffs,
-                dimension=len(coords),
-            )
+            try:
+                coords = [int(c) / 1000 for c in parts[4].split(",") if c]
+                coeffs_part = parts[5] if len(parts) > 5 else ""
+                coeffs = [int(c) / 1000 for c in coeffs_part.split(",") if c]
+                msg.anchor = AnchorVector(
+                    coordinates=coords,
+                    coefficients=coeffs,
+                    dimension=len(coords),
+                )
+            except (ValueError, IndexError) as e:
+                logger.warning(f"Malformed CHIT payload, skipping anchor: {e}")
 
         msg.compressed_size = len(data)
         return msg
@@ -235,6 +239,9 @@ class CHITBus:
 
             await self.nats_client.subscribe(subject, cb=nats_handler)
             logger.info(f"Subscribed to CHIT subject: {subject}")
+        else:
+            # Local mode: handlers are stored and invoked directly via publish_local
+            logger.info(f"Subscribed to CHIT subject (local mode): {subject}")
 
     def reconstruct_packet(
         self,

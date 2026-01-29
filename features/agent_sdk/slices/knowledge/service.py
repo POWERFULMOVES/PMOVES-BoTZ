@@ -214,6 +214,7 @@ class KnowledgeService:
                     "filters": task.filters,
                     "document_ids": [d.get("id") for d in task.documents if d.get("id")],
                 },
+                timeout=60.0,
             )
             response.raise_for_status()
             data = response.json()

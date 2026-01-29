@@ -133,6 +133,7 @@ class TaskHandler:
         self.tool_executor = tool_executor
         self.executor = ThreadPoolExecutor(max_workers=max_workers)
         self._running_tasks: Dict[str, threading.Event] = {}
+        self._running_tasks_lock = threading.Lock()
 
     def handle_jsonrpc(self, request: Dict) -> Dict:
         """
@@ -250,8 +251,9 @@ class TaskHandler:
             }
 
         # Signal cancellation
-        if task_id in self._running_tasks:
-            self._running_tasks[task_id].set()
+        with self._running_tasks_lock:
+            if task_id in self._running_tasks:
+                self._running_tasks[task_id].set()
 
         task.update_state(TaskState.CANCELLED)
         self.store.update(task)
@@ -283,13 +285,15 @@ class TaskHandler:
     def _start_task_execution(self, task: Task) -> None:
         """Start async task execution."""
         cancel_event = threading.Event()
-        self._running_tasks[task.id] = cancel_event
+        with self._running_tasks_lock:
+            self._running_tasks[task.id] = cancel_event
 
         def execute():
             try:
                 self._execute_task(task, cancel_event)
             finally:
-                self._running_tasks.pop(task.id, None)
+                with self._running_tasks_lock:
+                    self._running_tasks.pop(task.id, None)
 
         self.executor.submit(execute)
 
@@ -372,7 +376,8 @@ class TaskHandler:
     def shutdown(self) -> None:
         """Shutdown the executor and cancel running tasks."""
         # Signal all running tasks to cancel
-        for event in self._running_tasks.values():
-            event.set()
+        with self._running_tasks_lock:
+            for event in self._running_tasks.values():
+                event.set()
 
         self.executor.shutdown(wait=True)

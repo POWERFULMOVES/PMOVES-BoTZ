@@ -216,10 +216,15 @@ class MACAConsensus:
         final_packet.calculate_entropy()
 
         # Calculate entropy metric
+        # convergence_rate = entropy reduction per round (higher = faster convergence)
+        rounds = self._round_counts.get(packet_id, 1)
+        entropy_delta = initial_entropy - final_packet.entropy
+        convergence_rate = entropy_delta / rounds if rounds > 0 else 0.0
+
         entropy_metric = EntropyMetric(
             initial_entropy=initial_entropy,
             final_entropy=final_packet.entropy,
-            convergence_rate=len(votes) / self._round_counts.get(packet_id, 1),
+            convergence_rate=convergence_rate,
             participants=len(set(v.agent_id for v in votes)),
         )
 

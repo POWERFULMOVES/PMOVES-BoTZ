@@ -401,6 +401,7 @@ class A2AClient:
                 role=msg_data.get("role", "user"),
                 content=msg_data.get("content", ""),
                 timestamp=msg_data.get("timestamp", ""),
+                parts=msg_data.get("parts", []),
             ))
 
         for art_data in data.get("artifacts", []):

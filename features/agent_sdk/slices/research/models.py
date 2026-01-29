@@ -18,6 +18,12 @@ class SourceType(Enum):
     SUPASERCH = "supaserch"
     DEEP_RESEARCH = "deep_research"
     DOCUMENT = "document"
+    UNKNOWN = "unknown"  # Fallback for unrecognized source types
+
+    @classmethod
+    def _missing_(cls, value: object) -> "SourceType":
+        """Handle unknown source type values gracefully."""
+        return cls.UNKNOWN
 
 
 class ConfidenceLevel(Enum):
