@@ -26,6 +26,7 @@ Protocol:
 import asyncio
 import json
 import sys
+import time
 from typing import Any, Callable
 
 # Prometheus metrics
@@ -44,6 +45,22 @@ else:
     MCP_REQUESTS = None
     TOOL_CALLS = None
     REQUEST_LATENCY = None
+
+
+class _LatencyTracker:
+    """Context manager for tracking request latency."""
+    def __init__(self):
+        self.start_time = None
+        self.histogram = REQUEST_LATENCY
+
+    def __enter__(self):
+        if self.histogram:
+            self.start_time = time.time()
+        return self
+
+    def __exit__(self, *args):
+        if self.histogram and self.start_time is not None:
+            self.histogram.observe(time.time() - self.start_time)
 
 try:
     from .tools import hirag, nats, tensorzero, supabase
@@ -119,26 +136,27 @@ class MCPServer:
         if MCP_REQUESTS:
             MCP_REQUESTS.labels(method).inc()
 
-        try:
-            if method == "initialize":
-                result = await self._handle_initialize(params)
-            elif method == "tools/list":
-                result = await self._handle_tools_list()
-            elif method == "tools/call":
-                result = await self._handle_tools_call(params)
-                # Track tool call
-                if TOOL_CALLS:
-                    tool_name = params.get("name", "unknown")
-                    TOOL_CALLS.labels(tool_name).inc()
-            elif method == "ping":
-                result = {"pong": True}
-            else:
-                return self._error_response(request_id, -32601, f"Unknown method: {method}")
+        with _LatencyTracker():
+            try:
+                if method == "initialize":
+                    result = await self._handle_initialize(params)
+                elif method == "tools/list":
+                    result = await self._handle_tools_list()
+                elif method == "tools/call":
+                    result = await self._handle_tools_call(params)
+                    # Track tool call
+                    if TOOL_CALLS:
+                        tool_name = params.get("name", "unknown")
+                        TOOL_CALLS.labels(tool_name).inc()
+                elif method == "ping":
+                    result = {"pong": True}
+                else:
+                    return self._error_response(request_id, -32601, f"Unknown method: {method}")
 
-            return self._success_response(request_id, result)
+                return self._success_response(request_id, result)
 
-        except Exception as e:
-            return self._error_response(request_id, -32603, str(e))
+            except Exception as e:
+                return self._error_response(request_id, -32603, str(e))
 
     async def _handle_initialize(self, params: dict) -> dict:
         """Handle initialize request."""
@@ -310,7 +328,7 @@ async def run_http_server(server: MCPServer, host: str = "0.0.0.0", port: int = 
             "prometheus_enabled": PROMETHEUS_AVAILABLE,
         })
 
-    async def handle_metrics(request: web.Request) -> web.Response:
+    async def handle_metrics(_request: web.Request) -> web.Response:
         """Prometheus metrics endpoint."""
         if PROMETHEUS_AVAILABLE:
             metrics = generate_latest()

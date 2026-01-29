@@ -16,6 +16,7 @@ import logging
 import os
 import subprocess
 import sys
+import time
 from contextlib import asynccontextmanager
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from typing import Any, Dict, List, Optional
@@ -41,6 +42,22 @@ else:
     REQUEST_COUNT = None
     REQUEST_LATENCY = None
     TOOL_CALLS = None
+
+
+def _track_latency():
+    """Context manager for tracking request latency."""
+    if REQUEST_LATENCY:
+        return REQUEST_LATENCY.time()
+    else:
+        return _NoOpContext()
+
+
+class _NoOpContext:
+    """No-op context manager for when prometheus_client is not available."""
+    def __enter__(self):
+        return self
+    def __exit__(self, *args):
+        pass
 
 # Import A2A module
 try:
@@ -241,6 +258,24 @@ class GatewayHTTPHandler(BaseHTTPRequestHandler):
     a2a_task_handler: Optional['TaskHandler'] = None
     a2a_enabled: bool = A2A_AVAILABLE
 
+    def _normalize_path(self, path: str) -> str:
+        """Normalize path for metrics labels (strip query strings, normalize dynamic segments)."""
+        # Strip query strings
+        path = path.split('?')[0]
+        # Normalize dynamic task IDs
+        if path.startswith('/a2a/v1/tasks/') and len(path.split('/')) > 4:
+            return '/a2a/v1/tasks/{id}'
+        # Normalize dynamic server names in /tools/{server}
+        if path.startswith('/tools/') and len(path.split('/')) > 2:
+            return '/tools/{server}'
+        return path
+
+    def _track_tool_call(self, tool_name: str) -> None:
+        """Track tool call metrics."""
+        if TOOL_CALLS and tool_name:
+            server = tool_name.split(':')[0] if ':' in tool_name else 'unknown'
+            TOOL_CALLS.labels(server, tool_name).inc()
+
     def _send_json(self, status: int, data: Dict):
         """Send JSON response."""
         self.send_response(status)
@@ -272,188 +307,189 @@ class GatewayHTTPHandler(BaseHTTPRequestHandler):
         self.end_headers()
 
     def do_GET(self):
-        """Handle GET requests."""
-        # Standard PMOVES.AI healthz endpoint
-        if self.path == '/healthz':
-            self._send_json(200, {
-                "status": "healthy",
-                "service": "MCP Gateway",
-                "version": "2.0.0",
-                "upstream_servers": len(self.gateway.upstream_servers),
-                "a2a_enabled": self.a2a_enabled,
-                "prometheus_enabled": PROMETHEUS_AVAILABLE,
-            })
-            if REQUEST_COUNT:
-                REQUEST_COUNT.labels('GET', '/healthz').inc()
-            return
+        """Handle GET requests with latency tracking."""
+        with _track_latency():
+            # Standard PMOVES.AI healthz endpoint
+            if self.path == '/healthz':
+                self._send_json(200, {
+                    "status": "healthy",
+                    "service": "MCP Gateway",
+                    "version": "2.0.0",
+                    "upstream_servers": len(self.gateway.upstream_servers),
+                    "a2a_enabled": self.a2a_enabled,
+                    "prometheus_enabled": PROMETHEUS_AVAILABLE,
+                })
+                if REQUEST_COUNT:
+                    REQUEST_COUNT.labels('GET', '/healthz').inc()
+                return
 
-        # Prometheus metrics endpoint
-        if self.path == '/metrics':
-            self._send_metrics()
-            if REQUEST_COUNT:
-                REQUEST_COUNT.labels('GET', '/metrics').inc()
-            return
+            # Prometheus metrics endpoint
+            if self.path == '/metrics':
+                self._send_metrics()
+                if REQUEST_COUNT:
+                    REQUEST_COUNT.labels('GET', '/metrics').inc()
+                return
 
-        # A2A Agent Card discovery endpoint
-        if self.path == '/.well-known/agent.json':
-            if self.a2a_enabled:
+            # A2A Agent Card discovery endpoint
+            if self.path == '/.well-known/agent.json':
+                if self.a2a_enabled:
+                    tools = self.gateway.get_all_tools()
+                    card = get_agent_card(self.gateway.upstream_servers, tools)
+                    self._send_json(200, card.to_dict())
+                else:
+                    self._send_json(501, {"error": "A2A protocol not available"})
+                if REQUEST_COUNT:
+                    REQUEST_COUNT.labels('GET', '/.well-known/agent.json').inc()
+                return
+
+            # A2A health check
+            if self.path == '/a2a/health' or self.path == '/a2a/v1/health':
+                self._send_json(200, {
+                    "status": "healthy" if self.a2a_enabled else "unavailable",
+                    "service": "A2A Protocol",
+                    "version": "1.0.0",
+                    "enabled": self.a2a_enabled,
+                })
+                if REQUEST_COUNT:
+                    REQUEST_COUNT.labels('GET', self.path).inc()
+                return
+
+            # A2A task info (GET)
+            if self.path.startswith('/a2a/v1/tasks/') and self.a2a_task_handler:
+                task_id = self.path.split('/')[4]
+                result = self.a2a_task_handler.handle_jsonrpc({
+                    "jsonrpc": "2.0",
+                    "method": "tasks/get",
+                    "params": {"task_id": task_id},
+                    "id": 1,
+                })
+                status = 200 if "result" in result else 404
+                self._send_json(status, result)
+                if REQUEST_COUNT:
+                    REQUEST_COUNT.labels('GET', '/a2a/v1/tasks/{id}').inc()
+                return
+
+            if self.path == '/health':
+                self._send_json(200, {
+                    "status": "healthy",
+                    "service": "MCP Gateway",
+                    "version": "2.0.0",
+                    "upstream_servers": len(self.gateway.upstream_servers),
+                    "a2a_enabled": self.a2a_enabled,
+                })
+                if REQUEST_COUNT:
+                    REQUEST_COUNT.labels('GET', '/health').inc()
+
+            elif self.path == '/servers':
+                servers = self.gateway.list_upstream_servers()
+                self._send_json(200, {"servers": servers})
+                if REQUEST_COUNT:
+                    REQUEST_COUNT.labels('GET', '/servers').inc()
+
+            elif self.path == '/tools':
                 tools = self.gateway.get_all_tools()
-                card = get_agent_card(self.gateway.upstream_servers, tools)
-                self._send_json(200, card.to_dict())
+                self._send_json(200, {
+                    "tools": tools,
+                    "count": len(tools)
+                })
+                if REQUEST_COUNT:
+                    REQUEST_COUNT.labels('GET', '/tools').inc()
+
+            elif self.path.startswith('/tools/'):
+                server_name = self.path.split('/')[2]
+                tools = self.gateway.get_tools_from_server(server_name)
+                self._send_json(200, {
+                    "server": server_name,
+                    "tools": tools,
+                    "count": len(tools)
+                })
+                if REQUEST_COUNT:
+                    REQUEST_COUNT.labels('GET', '/tools/{server}').inc()
+
             else:
-                self._send_json(501, {"error": "A2A protocol not available"})
-            if REQUEST_COUNT:
-                REQUEST_COUNT.labels('GET', '/.well-known/agent.json').inc()
-            return
-
-        # A2A health check
-        if self.path == '/a2a/health' or self.path == '/a2a/v1/health':
-            self._send_json(200, {
-                "status": "healthy" if self.a2a_enabled else "unavailable",
-                "service": "A2A Protocol",
-                "version": "1.0.0",
-                "enabled": self.a2a_enabled,
-            })
-            if REQUEST_COUNT:
-                REQUEST_COUNT.labels('GET', self.path).inc()
-            return
-
-        # A2A task info (GET)
-        if self.path.startswith('/a2a/v1/tasks/') and self.a2a_task_handler:
-            task_id = self.path.split('/')[4]
-            result = self.a2a_task_handler.handle_jsonrpc({
-                "jsonrpc": "2.0",
-                "method": "tasks/get",
-                "params": {"task_id": task_id},
-                "id": 1,
-            })
-            status = 200 if "result" in result else 404
-            self._send_json(status, result)
-            if REQUEST_COUNT:
-                REQUEST_COUNT.labels('GET', '/a2a/v1/tasks/{id}').inc()
-            return
-
-        if self.path == '/health':
-            self._send_json(200, {
-                "status": "healthy",
-                "service": "MCP Gateway",
-                "version": "2.0.0",
-                "upstream_servers": len(self.gateway.upstream_servers),
-                "a2a_enabled": self.a2a_enabled,
-            })
-            if REQUEST_COUNT:
-                REQUEST_COUNT.labels('GET', '/health').inc()
-
-        elif self.path == '/servers':
-            servers = self.gateway.list_upstream_servers()
-            self._send_json(200, {"servers": servers})
-            if REQUEST_COUNT:
-                REQUEST_COUNT.labels('GET', '/servers').inc()
-
-        elif self.path == '/tools':
-            tools = self.gateway.get_all_tools()
-            self._send_json(200, {
-                "tools": tools,
-                "count": len(tools)
-            })
-            if REQUEST_COUNT:
-                REQUEST_COUNT.labels('GET', '/tools').inc()
-
-        elif self.path.startswith('/tools/'):
-            server_name = self.path.split('/')[2]
-            tools = self.gateway.get_tools_from_server(server_name)
-            self._send_json(200, {
-                "server": server_name,
-                "tools": tools,
-                "count": len(tools)
-            })
-            if REQUEST_COUNT:
-                REQUEST_COUNT.labels('GET', '/tools/{server}').inc()
-
-        else:
-            self._send_json(404, {"error": "Not found"})
+                self._send_json(404, {"error": "Not found"})
 
     def do_POST(self):
-        """Handle POST requests."""
+        """Handle POST requests with latency tracking."""
         content_length = int(self.headers.get('Content-Length', 0))
         body = self.rfile.read(content_length).decode() if content_length > 0 else '{}'
 
+        # Normalize path for metrics
+        normalized_path = self._normalize_path(self.path)
+
         # Track request
         if REQUEST_COUNT:
-            REQUEST_COUNT.labels('POST', self.path).inc()
+            REQUEST_COUNT.labels('POST', normalized_path).inc()
 
-        try:
-            data = json.loads(body)
-        except json.JSONDecodeError:
-            self._send_json(400, {"error": "Invalid JSON"})
-            return
-
-        # A2A JSON-RPC endpoint
-        if self.path == '/a2a/v1/tasks' or self.path == '/a2a/tasks':
-            if self.a2a_task_handler:
-                result = self.a2a_task_handler.handle_jsonrpc(data)
-                status = 200 if "result" in result else 400
-                self._send_json(status, result)
-            else:
-                self._send_json(501, {"error": "A2A protocol not available"})
-            return
-
-        if self.path == '/call':
-            # Tool call endpoint
-            tool_name = data.get('tool') or data.get('name')
-            arguments = data.get('arguments', {})
-
-            if not tool_name:
-                self._send_json(400, {"error": "Missing tool name"})
+        with _track_latency():
+            try:
+                data = json.loads(body)
+            except json.JSONDecodeError:
+                self._send_json(400, {"error": "Invalid JSON"})
                 return
 
-            # Track tool call metrics
-            if TOOL_CALLS:
-                server = tool_name.split(':')[0] if ':' in tool_name else 'unknown'
-                TOOL_CALLS.labels(server, tool_name).inc()
+            # A2A JSON-RPC endpoint
+            if self.path == '/a2a/v1/tasks' or self.path == '/a2a/tasks':
+                if self.a2a_task_handler:
+                    result = self.a2a_task_handler.handle_jsonrpc(data)
+                    status = 200 if "result" in result else 400
+                    self._send_json(status, result)
+                else:
+                    self._send_json(501, {"error": "A2A protocol not available"})
+                return
 
-            result = self.gateway.call_tool(tool_name, arguments)
-            self._send_json(200, result)
+            if self.path == '/call':
+                # Tool call endpoint
+                tool_name = data.get('tool') or data.get('name')
+                arguments = data.get('arguments', {})
 
-        elif self.path == '/mcp':
-            # MCP JSON-RPC endpoint
-            method = data.get('method')
-            params = data.get('params', {})
-            req_id = data.get('id', 1)
-
-            if method == 'tools/list':
-                tools = self.gateway.get_all_tools()
-                self._send_json(200, {
-                    "jsonrpc": "2.0",
-                    "id": req_id,
-                    "result": {"tools": tools}
-                })
-
-            elif method == 'tools/call':
-                tool_name = params.get('name')
-                arguments = params.get('arguments', {})
+                if not tool_name:
+                    self._send_json(400, {"error": "Missing tool name"})
+                    return
 
                 # Track tool call metrics
-                if TOOL_CALLS and tool_name:
-                    server = tool_name.split(':')[0] if ':' in tool_name else 'unknown'
-                    TOOL_CALLS.labels(server, tool_name).inc()
+                self._track_tool_call(tool_name)
 
                 result = self.gateway.call_tool(tool_name, arguments)
-                self._send_json(200, {
-                    "jsonrpc": "2.0",
-                    "id": req_id,
-                    "result": result.get('result', result)
-                })
+                self._send_json(200, result)
+
+            elif self.path == '/mcp':
+                # MCP JSON-RPC endpoint
+                method = data.get('method')
+                params = data.get('params', {})
+                req_id = data.get('id', 1)
+
+                if method == 'tools/list':
+                    tools = self.gateway.get_all_tools()
+                    self._send_json(200, {
+                        "jsonrpc": "2.0",
+                        "id": req_id,
+                        "result": {"tools": tools}
+                    })
+
+                elif method == 'tools/call':
+                    tool_name = params.get('name')
+                    arguments = params.get('arguments', {})
+
+                    # Track tool call metrics
+                    self._track_tool_call(tool_name)
+
+                    result = self.gateway.call_tool(tool_name, arguments)
+                    self._send_json(200, {
+                        "jsonrpc": "2.0",
+                        "id": req_id,
+                        "result": result.get('result', result)
+                    })
+
+                else:
+                    self._send_json(400, {
+                        "jsonrpc": "2.0",
+                        "id": req_id,
+                        "error": {"code": -32601, "message": f"Method not found: {method}"}
+                    })
 
             else:
-                self._send_json(400, {
-                    "jsonrpc": "2.0",
-                    "id": req_id,
-                    "error": {"code": -32601, "message": f"Method not found: {method}"}
-                })
-
-        else:
-            self._send_json(404, {"error": "Not found"})
+                self._send_json(404, {"error": "Not found"})
 
     def log_message(self, format, *args):
         """Log HTTP requests."""
@@ -467,6 +503,12 @@ def main():
 
     logger.info(f"Starting MCP Gateway on {host}:{port}")
     logger.info(f"Configured upstream servers: {list(MCP_UPSTREAM_SERVERS.keys())}")
+
+    # Log Prometheus metrics status
+    if PROMETHEUS_AVAILABLE:
+        logger.info("Prometheus Metrics: Enabled at /metrics")
+    else:
+        logger.warning("Prometheus Metrics: Disabled (prometheus_client not installed)")
 
     # Initialize A2A if available
     if A2A_AVAILABLE:
