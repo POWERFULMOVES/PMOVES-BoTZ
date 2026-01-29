@@ -52,11 +52,13 @@ bashToolPatterns:
   # Security violations
   - pattern: "chmod 777"
     reason: "Insecure permission setting - use minimal permissions"
-  - pattern: "curl | sh"
+  - pattern: "curl.*\\|.*sh"
     reason: "Piping remote scripts is a security risk"
-  - pattern: "curl | bash"
+  - pattern: "curl.*\\|.*bash"
     reason: "Piping remote scripts is a security risk"
-  - pattern: "wget -O - | sh"
+  - pattern: "wget.*\\|.*sh"
+    reason: "Piping remote scripts is a security risk"
+  - pattern: "wget.*\\|.*bash"
     reason: "Piping remote scripts is a security risk"
 
   # Fork bomb protection
