@@ -24,6 +24,24 @@ from urllib.error import URLError
 
 import yaml
 
+# Prometheus metrics
+try:
+    from prometheus_client import Counter, Histogram, generate_latest, CONTENT_TYPE_LATEST
+    PROMETHEUS_AVAILABLE = True
+except ImportError:
+    PROMETHEUS_AVAILABLE = False
+
+# Metrics
+if PROMETHEUS_AVAILABLE:
+    REQUEST_COUNT = Counter('mcp_gateway_requests_total', 'Total MCP gateway requests', ['method', 'endpoint'])
+    REQUEST_LATENCY = Histogram('mcp_gateway_request_latency_seconds', 'MCP gateway request latency')
+    TOOL_CALLS = Counter('mcp_gateway_tool_calls_total', 'Total tool calls', ['server', 'tool'])
+else:
+    # Fallback no-op metrics
+    REQUEST_COUNT = None
+    REQUEST_LATENCY = None
+    TOOL_CALLS = None
+
 # Import A2A module
 try:
     from a2a import get_agent_card, TaskHandler
@@ -231,6 +249,20 @@ class GatewayHTTPHandler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(json.dumps(data, indent=2).encode())
 
+    def _send_metrics(self):
+        """Send Prometheus metrics."""
+        if PROMETHEUS_AVAILABLE:
+            self.send_response(200)
+            self.send_header('Content-Type', CONTENT_TYPE_LATEST)
+            self.send_header('Access-Control-Allow-Origin', '*')
+            self.end_headers()
+            self.wfile.write(generate_latest())
+        else:
+            self.send_response(503)
+            self.send_header('Content-Type', 'text/plain')
+            self.end_headers()
+            self.wfile.write(b'Prometheus metrics not available (prometheus_client not installed)')
+
     def do_OPTIONS(self):
         """Handle CORS preflight."""
         self.send_response(200)
@@ -241,6 +273,27 @@ class GatewayHTTPHandler(BaseHTTPRequestHandler):
 
     def do_GET(self):
         """Handle GET requests."""
+        # Standard PMOVES.AI healthz endpoint
+        if self.path == '/healthz':
+            self._send_json(200, {
+                "status": "healthy",
+                "service": "MCP Gateway",
+                "version": "2.0.0",
+                "upstream_servers": len(self.gateway.upstream_servers),
+                "a2a_enabled": self.a2a_enabled,
+                "prometheus_enabled": PROMETHEUS_AVAILABLE,
+            })
+            if REQUEST_COUNT:
+                REQUEST_COUNT.labels('GET', '/healthz').inc()
+            return
+
+        # Prometheus metrics endpoint
+        if self.path == '/metrics':
+            self._send_metrics()
+            if REQUEST_COUNT:
+                REQUEST_COUNT.labels('GET', '/metrics').inc()
+            return
+
         # A2A Agent Card discovery endpoint
         if self.path == '/.well-known/agent.json':
             if self.a2a_enabled:
@@ -249,6 +302,8 @@ class GatewayHTTPHandler(BaseHTTPRequestHandler):
                 self._send_json(200, card.to_dict())
             else:
                 self._send_json(501, {"error": "A2A protocol not available"})
+            if REQUEST_COUNT:
+                REQUEST_COUNT.labels('GET', '/.well-known/agent.json').inc()
             return
 
         # A2A health check
@@ -259,6 +314,8 @@ class GatewayHTTPHandler(BaseHTTPRequestHandler):
                 "version": "1.0.0",
                 "enabled": self.a2a_enabled,
             })
+            if REQUEST_COUNT:
+                REQUEST_COUNT.labels('GET', self.path).inc()
             return
 
         # A2A task info (GET)
@@ -272,6 +329,8 @@ class GatewayHTTPHandler(BaseHTTPRequestHandler):
             })
             status = 200 if "result" in result else 404
             self._send_json(status, result)
+            if REQUEST_COUNT:
+                REQUEST_COUNT.labels('GET', '/a2a/v1/tasks/{id}').inc()
             return
 
         if self.path == '/health':
@@ -282,10 +341,14 @@ class GatewayHTTPHandler(BaseHTTPRequestHandler):
                 "upstream_servers": len(self.gateway.upstream_servers),
                 "a2a_enabled": self.a2a_enabled,
             })
+            if REQUEST_COUNT:
+                REQUEST_COUNT.labels('GET', '/health').inc()
 
         elif self.path == '/servers':
             servers = self.gateway.list_upstream_servers()
             self._send_json(200, {"servers": servers})
+            if REQUEST_COUNT:
+                REQUEST_COUNT.labels('GET', '/servers').inc()
 
         elif self.path == '/tools':
             tools = self.gateway.get_all_tools()
@@ -293,6 +356,8 @@ class GatewayHTTPHandler(BaseHTTPRequestHandler):
                 "tools": tools,
                 "count": len(tools)
             })
+            if REQUEST_COUNT:
+                REQUEST_COUNT.labels('GET', '/tools').inc()
 
         elif self.path.startswith('/tools/'):
             server_name = self.path.split('/')[2]
@@ -302,6 +367,8 @@ class GatewayHTTPHandler(BaseHTTPRequestHandler):
                 "tools": tools,
                 "count": len(tools)
             })
+            if REQUEST_COUNT:
+                REQUEST_COUNT.labels('GET', '/tools/{server}').inc()
 
         else:
             self._send_json(404, {"error": "Not found"})
@@ -310,6 +377,10 @@ class GatewayHTTPHandler(BaseHTTPRequestHandler):
         """Handle POST requests."""
         content_length = int(self.headers.get('Content-Length', 0))
         body = self.rfile.read(content_length).decode() if content_length > 0 else '{}'
+
+        # Track request
+        if REQUEST_COUNT:
+            REQUEST_COUNT.labels('POST', self.path).inc()
 
         try:
             data = json.loads(body)
@@ -336,6 +407,11 @@ class GatewayHTTPHandler(BaseHTTPRequestHandler):
                 self._send_json(400, {"error": "Missing tool name"})
                 return
 
+            # Track tool call metrics
+            if TOOL_CALLS:
+                server = tool_name.split(':')[0] if ':' in tool_name else 'unknown'
+                TOOL_CALLS.labels(server, tool_name).inc()
+
             result = self.gateway.call_tool(tool_name, arguments)
             self._send_json(200, result)
 
@@ -356,6 +432,12 @@ class GatewayHTTPHandler(BaseHTTPRequestHandler):
             elif method == 'tools/call':
                 tool_name = params.get('name')
                 arguments = params.get('arguments', {})
+
+                # Track tool call metrics
+                if TOOL_CALLS and tool_name:
+                    server = tool_name.split(':')[0] if ':' in tool_name else 'unknown'
+                    TOOL_CALLS.labels(server, tool_name).inc()
+
                 result = self.gateway.call_tool(tool_name, arguments)
                 self._send_json(200, {
                     "jsonrpc": "2.0",

@@ -1,0 +1,10 @@
+# HTTP server and JSON handling
+requests>=2.31.0
+pyyaml>=6.0.0
+
+# FastAPI (optional, for future use)
+fastapi>=0.100.0
+uvicorn>=0.23.0
+
+# Prometheus metrics
+prometheus-client>=0.19.0
