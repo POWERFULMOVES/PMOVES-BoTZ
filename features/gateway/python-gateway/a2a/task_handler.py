@@ -58,12 +58,14 @@ class TaskStore:
             return task
 
     def get(self, task_id: str) -> Optional[Task]:
-        """Get a task by ID."""
-        return self._tasks.get(task_id)
+        """Get a task by ID (thread-safe)."""
+        with self._lock:
+            return self._tasks.get(task_id)
 
     def list_all(self, state: Optional[TaskState] = None, limit: int = 100) -> List[Task]:
-        """List tasks, optionally filtered by state."""
-        tasks = list(self._tasks.values())
+        """List tasks, optionally filtered by state (thread-safe)."""
+        with self._lock:
+            tasks = list(self._tasks.values())
         if state:
             tasks = [t for t in tasks if t.state == state]
         # Sort by created_at descending

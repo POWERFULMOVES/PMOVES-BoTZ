@@ -56,6 +56,7 @@ class TTSService:
         kokoro_url: str = "http://localhost:8090",
         fish_speech_url: str = "http://localhost:8091",
         indextts_url: str = "http://localhost:8092",
+        vibevoice_url: str = "http://localhost:8093",
         elevenlabs_api_key: str = "",
         openai_api_key: str = "",
     ):
@@ -67,6 +68,7 @@ class TTSService:
             kokoro_url: Kokoro TTS service URL
             fish_speech_url: Fish Speech service URL
             indextts_url: IndexTTS2 service URL
+            vibevoice_url: VibeVoice multi-speaker service URL
             elevenlabs_api_key: ElevenLabs API key
             openai_api_key: OpenAI API key for TTS
         """
@@ -75,6 +77,7 @@ class TTSService:
             TTSEngine.KOKORO: kokoro_url,
             TTSEngine.FISH_SPEECH: fish_speech_url,
             TTSEngine.INDEXTTS2: indextts_url,
+            TTSEngine.VIBEVOICE: vibevoice_url,
         }
         self.elevenlabs_api_key = elevenlabs_api_key
         self.openai_api_key = openai_api_key
@@ -188,9 +191,16 @@ class TTSService:
             )
 
         try:
-            # For VibeVoice or similar multi-speaker engines
+            # Use VibeVoice engine for multi-speaker synthesis
+            vibevoice_url = self.engine_urls.get(TTSEngine.VIBEVOICE)
+            if not vibevoice_url:
+                return TTSResult(
+                    request_id=request.id,
+                    error="VIBEVOICE engine URL not configured",
+                )
+
             response = await self.http_client.post(
-                f"{self.engine_urls.get(TTSEngine.KOKORO)}/multi-speaker",
+                f"{vibevoice_url}/multi-speaker",
                 json=request.to_dict(),
                 timeout=120.0,
             )

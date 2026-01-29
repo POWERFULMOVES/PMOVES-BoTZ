@@ -13,7 +13,11 @@ Security-focused code review with OWASP Top 10 coverage. Use this skill when:
 ## Quick Start
 
 ```python
-from slices.code_review import CodeReviewService, ReviewTask, FindingCategory
+from features.agent_sdk.slices.code_review import (
+    CodeReviewService,
+    FindingCategory,
+    ReviewTask,
+)
 
 service = CodeReviewService()
 task = ReviewTask(

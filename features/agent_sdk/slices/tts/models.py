@@ -75,6 +75,11 @@ class VoiceConfig:
     punctuation_rules: List[PunctuationRule] = field(default_factory=list)
     metadata: Dict[str, Any] = field(default_factory=dict)
 
+    def __post_init__(self):
+        """Validate and clamp pitch/speed to valid ranges."""
+        self.pitch = max(0.5, min(2.0, self.pitch))
+        self.speed = max(0.5, min(2.0, self.speed))
+
     def to_dict(self) -> Dict:
         return {
             "id": self.id,

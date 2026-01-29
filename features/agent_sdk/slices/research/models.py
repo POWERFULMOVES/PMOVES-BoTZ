@@ -28,6 +28,13 @@ class ConfidenceLevel(Enum):
     UNCERTAIN = "uncertain"
 
 
+class ResearchDepth(Enum):
+    """Depth levels for research tasks."""
+    SHALLOW = "shallow"    # Quick lookup, limited sources
+    STANDARD = "standard"  # Normal research, balanced depth
+    DEEP = "deep"          # Comprehensive research, all sources
+
+
 @dataclass
 class SourceCitation:
     """Citation for a research source."""
@@ -56,7 +63,7 @@ class ResearchTask:
     """A research task specification."""
     id: str = field(default_factory=lambda: str(uuid.uuid4()))
     query: str = ""
-    depth: str = "standard"  # shallow, standard, deep
+    depth: ResearchDepth = ResearchDepth.STANDARD
     sources: List[SourceType] = field(default_factory=lambda: [SourceType.HIRAG, SourceType.WEB_SEARCH])
     max_sources: int = 10
     include_citations: bool = True
@@ -67,7 +74,7 @@ class ResearchTask:
         return {
             "id": self.id,
             "query": self.query,
-            "depth": self.depth,
+            "depth": self.depth.value,
             "sources": [s.value for s in self.sources],
             "max_sources": self.max_sources,
             "include_citations": self.include_citations,

@@ -315,16 +315,26 @@ class MACAConsensus:
 
         # Apply weighted average of transformations
         total_weight = sum(w for _, w in weighted_transforms)
+        if total_weight == 0:
+            return result
+
         for transform, weight in weighted_transforms:
             # Weight the transformation strength
             scaled_transform = {}
+            weight_factor = weight / total_weight
             for key, value in transform.items():
                 if isinstance(value, (int, float)):
                     # Interpolate toward transformation based on weight
                     if key == "scale":
-                        scaled_transform[key] = 1 + (value - 1) * (weight / total_weight)
+                        scaled_transform[key] = 1 + (value - 1) * weight_factor
                     else:
-                        scaled_transform[key] = value * (weight / total_weight)
+                        scaled_transform[key] = value * weight_factor
+                elif isinstance(value, (list, tuple)):
+                    # Scale vector components (e.g., translation offsets)
+                    scaled_transform[key] = type(value)(
+                        v * weight_factor if isinstance(v, (int, float)) else v
+                        for v in value
+                    )
                 else:
                     scaled_transform[key] = value
 

@@ -316,24 +316,50 @@ def create_chit_bus(
     nats_url: Optional[str] = None,
 ) -> CHITBus:
     """
-    Create a CHIT Bus instance.
+    Create a CHIT Bus instance (sync factory, local-only).
+
+    For distributed messaging with NATS, use create_chit_bus_async() instead.
+
+    Args:
+        agent_id: Agent identifier
+        nats_url: Optional NATS URL (logged for info, but connection requires async)
+
+    Returns:
+        CHITBus instance in local mode
+    """
+    if nats_url:
+        logger.info(
+            f"CHIT Bus configured for NATS at {nats_url}. "
+            "Use create_chit_bus_async() for actual NATS connection."
+        )
+
+    return CHITBus(agent_id=agent_id, nats_client=None)
+
+
+async def create_chit_bus_async(
+    agent_id: str,
+    nats_url: Optional[str] = None,
+) -> CHITBus:
+    """
+    Create a CHIT Bus instance with NATS connection (async factory).
 
     Args:
         agent_id: Agent identifier
         nats_url: Optional NATS URL for distributed messaging
 
     Returns:
-        Configured CHITBus instance
+        Configured CHITBus instance with active NATS connection
     """
     nats_client = None
 
-    # Initialize NATS if URL provided
     if nats_url:
         try:
             import nats
-            # Note: Connection should be done async
-            logger.info(f"CHIT Bus configured with NATS: {nats_url}")
+            nats_client = await nats.connect(nats_url)
+            logger.info(f"CHIT Bus connected to NATS: {nats_url}")
         except ImportError:
-            logger.warning("NATS not available - CHIT Bus running in local mode")
+            logger.warning("NATS package not installed - running in local mode")
+        except Exception as e:
+            logger.warning(f"NATS connection failed ({e}) - running in local mode")
 
     return CHITBus(agent_id=agent_id, nats_client=nats_client)

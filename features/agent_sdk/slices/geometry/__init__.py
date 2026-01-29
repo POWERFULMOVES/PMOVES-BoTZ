@@ -11,17 +11,17 @@ Reference: docs/agents/PMOVES.AI Agentic Architecture Deep Dive.md (Section 5)
 Use: from slices.geometry import ShapeAttributor, CHITBus, MACAConsensus
 """
 
+from .chit_bus import CHITBus, CHITMessage, create_chit_bus, create_chit_bus_async
+from .maca import ConsensusResult, MACAConsensus
 from .models import (
-    GeometryPacket,
-    ShapeAttribute,
-    TopologyFeature,
     AnchorVector,
     ConsensusVote,
     EntropyMetric,
+    GeometryPacket,
+    ShapeAttribute,
+    TopologyFeature,
 )
-from .shape_attribution import ShapeAttributor, GeometryNormalizer, CompositeBuilder
-from .chit_bus import CHITBus, CHITMessage
-from .maca import MACAConsensus, ConsensusResult
+from .shape_attribution import CompositeBuilder, GeometryNormalizer, ShapeAttributor
 from .. import register_slice
 
 # Register this slice
@@ -34,6 +34,8 @@ __all__ = [
     "CompositeBuilder",
     "ConsensusResult",
     "ConsensusVote",
+    "create_chit_bus",
+    "create_chit_bus_async",
     "EntropyMetric",
     "GeometryNormalizer",
     "GeometryPacket",

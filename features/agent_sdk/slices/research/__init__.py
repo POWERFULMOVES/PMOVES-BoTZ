@@ -10,16 +10,26 @@ This vertical slice encapsulates all research functionality:
 Use: from slices.research import ResearchService
 """
 
+from .models import (
+    ConfidenceLevel,
+    ResearchDepth,
+    ResearchResult,
+    ResearchTask,
+    SourceCitation,
+    SourceType,
+)
 from .service import ResearchService
-from .models import ResearchTask, ResearchResult, SourceCitation
 from .. import register_slice
 
 # Register this slice
 register_slice("research")(ResearchService)
 
 __all__ = [
+    "ConfidenceLevel",
+    "ResearchDepth",
+    "ResearchResult",
     "ResearchService",
     "ResearchTask",
-    "ResearchResult",
     "SourceCitation",
+    "SourceType",
 ]

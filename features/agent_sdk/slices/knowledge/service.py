@@ -274,24 +274,25 @@ class KnowledgeService:
         }
 
         if not self.http_client:
+            logger.warning("Health check skipped: HTTP client not configured")
             return status
 
         try:
-            resp = await self.http_client.get(f"{self.hirag_url}/health")
+            resp = await self.http_client.get(f"{self.hirag_url}/health", timeout=5.0)
             status["hirag"] = resp.status_code == 200
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug(f"Hi-RAG health check failed: {e}")
 
         try:
-            resp = await self.http_client.get(f"{self.qdrant_url}/health")
+            resp = await self.http_client.get(f"{self.qdrant_url}/health", timeout=5.0)
             status["qdrant"] = resp.status_code == 200
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug(f"Qdrant health check failed: {e}")
 
         try:
-            resp = await self.http_client.get(f"{self.meilisearch_url}/health")
+            resp = await self.http_client.get(f"{self.meilisearch_url}/health", timeout=5.0)
             status["meilisearch"] = resp.status_code == 200
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug(f"Meilisearch health check failed: {e}")
 
         return status
