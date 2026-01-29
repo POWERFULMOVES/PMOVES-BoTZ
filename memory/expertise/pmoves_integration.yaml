@@ -18,7 +18,7 @@ modes:
       - "TENSORZERO_BASE_URL available"
     services:
       tensorzero:
-        url: "${TENSORZERO_BASE_URL:-http://tensorzero:3000}"
+        url: "${TENSORZERO_BASE_URL:-http://tensorzero-gateway:3030}"
         purpose: "LLM inference and embeddings"
         fallback: null  # Required in docked mode
       hirag:
@@ -120,7 +120,7 @@ discovery:
     - step: 2
       name: "Docker DNS"
       pattern: "http://${service_name}:${port}"
-      example: "http://tensorzero:3000"
+      example: "http://tensorzero-gateway:3030"
     - step: 3
       name: "Health Check Validation"
       pattern: "GET /healthz or /health"

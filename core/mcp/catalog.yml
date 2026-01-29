@@ -74,7 +74,7 @@ mcpServers:
     env:
       N8N_API_KEY: ${N8N_API_KEY}
       N8N_API_URL: ${N8N_API_URL:-http://n8n:5678/api/v1}
-      TENSORZERO_BASE_URL: ${TENSORZERO_BASE_URL:-http://tensorzero:3000}
+      TENSORZERO_BASE_URL: ${TENSORZERO_BASE_URL:-http://tensorzero-gateway:3030}
 
   # Hostinger VPS/DNS/Domain Management
   hostinger:

@@ -26,7 +26,41 @@ Protocol:
 import asyncio
 import json
 import sys
+import time
 from typing import Any, Callable
+
+# Prometheus metrics
+try:
+    from prometheus_client import Counter, Histogram, generate_latest, CONTENT_TYPE_LATEST
+    PROMETHEUS_AVAILABLE = True
+except ImportError:
+    PROMETHEUS_AVAILABLE = False
+
+# Metrics
+if PROMETHEUS_AVAILABLE:
+    MCP_REQUESTS = Counter('mcp_bridge_requests_total', 'Total MCP requests', ['method'])
+    TOOL_CALLS = Counter('mcp_bridge_tool_calls_total', 'Total tool calls', ['tool'])
+    REQUEST_LATENCY = Histogram('mcp_bridge_request_latency_seconds', 'MCP request latency')
+else:
+    MCP_REQUESTS = None
+    TOOL_CALLS = None
+    REQUEST_LATENCY = None
+
+
+class _LatencyTracker:
+    """Context manager for tracking request latency."""
+    def __init__(self):
+        self.start_time = None
+        self.histogram = REQUEST_LATENCY
+
+    def __enter__(self):
+        if self.histogram:
+            self.start_time = time.time()
+        return self
+
+    def __exit__(self, *args):
+        if self.histogram and self.start_time is not None:
+            self.histogram.observe(time.time() - self.start_time)
 
 try:
     from .tools import hirag, nats, tensorzero, supabase
@@ -98,22 +132,31 @@ class MCPServer:
         params = request.get("params", {})
         request_id = request.get("id")
 
-        try:
-            if method == "initialize":
-                result = await self._handle_initialize(params)
-            elif method == "tools/list":
-                result = await self._handle_tools_list()
-            elif method == "tools/call":
-                result = await self._handle_tools_call(params)
-            elif method == "ping":
-                result = {"pong": True}
-            else:
-                return self._error_response(request_id, -32601, f"Unknown method: {method}")
+        # Track request
+        if MCP_REQUESTS:
+            MCP_REQUESTS.labels(method).inc()
 
-            return self._success_response(request_id, result)
+        with _LatencyTracker():
+            try:
+                if method == "initialize":
+                    result = await self._handle_initialize(params)
+                elif method == "tools/list":
+                    result = await self._handle_tools_list()
+                elif method == "tools/call":
+                    result = await self._handle_tools_call(params)
+                    # Track tool call
+                    if TOOL_CALLS:
+                        tool_name = params.get("name", "unknown")
+                        TOOL_CALLS.labels(tool_name).inc()
+                elif method == "ping":
+                    result = {"pong": True}
+                else:
+                    return self._error_response(request_id, -32601, f"Unknown method: {method}")
 
-        except Exception as e:
-            return self._error_response(request_id, -32603, str(e))
+                return self._success_response(request_id, result)
+
+            except Exception as e:
+                return self._error_response(request_id, -32603, str(e))
 
     async def _handle_initialize(self, params: dict) -> dict:
         """Handle initialize request."""
@@ -277,16 +320,49 @@ async def run_http_server(server: MCPServer, host: str = "0.0.0.0", port: int = 
 
     async def handle_health(request: web.Request) -> web.Response:
         """Health check endpoint."""
-        return web.json_response({
-            "status": "healthy",
-            "server": server.name,
-            "version": server.version,
-            "tools_count": len(server.tools),
-        })
+        # Import here to avoid import errors if module not available
+        try:
+            from .utils.integration_health import IntegrationHealth
+            health_check = IntegrationHealth()
+            integrations = await health_check.get_status()
+
+            all_healthy = all(integration["healthy"] for integration in integrations.values())
+            status = "healthy" if all_healthy else "degraded"
+
+            return web.json_response({
+                "status": status,
+                "server": server.name,
+                "version": server.version,
+                "tools_count": len(server.tools),
+                "prometheus_enabled": PROMETHEUS_AVAILABLE,
+                "integrations": integrations,
+            })
+        except Exception as e:
+            # If integration health checks fail, return degraded status
+            return web.json_response({
+                "status": "degraded",
+                "server": server.name,
+                "version": server.version,
+                "tools_count": len(server.tools),
+                "prometheus_enabled": PROMETHEUS_AVAILABLE,
+                "error": f"Integration health check failed: {str(e)}",
+            })
+
+    async def handle_metrics(_request: web.Request) -> web.Response:
+        """Prometheus metrics endpoint."""
+        if PROMETHEUS_AVAILABLE:
+            metrics = generate_latest()
+            return web.Response(body=metrics, content_type=CONTENT_TYPE_LATEST)
+        else:
+            return web.json_response(
+                {"error": "Prometheus metrics not available"},
+                status=503
+            )
 
     app = web.Application()
     app.router.add_post("/mcp", handle_post)
     app.router.add_get("/healthz", handle_health)
+    app.router.add_get("/metrics", handle_metrics)
     app.router.add_get("/tools", lambda r: web.json_response({"tools": server.tools}))
 
     runner = web.AppRunner(app)
@@ -296,6 +372,19 @@ async def run_http_server(server: MCPServer, host: str = "0.0.0.0", port: int = 
 
     print(f"PMOVES MCP Server running at http://{host}:{port}")
     print(f"Tools available: {len(server.tools)}")
+
+    # Check integration health at startup
+    try:
+        from .utils.integration_health import IntegrationHealth
+        health_check = IntegrationHealth()
+        integrations = await health_check.get_status()
+
+        print("[STARTUP] Integration Status:")
+        for name, status in integrations.items():
+            health_str = "✓" if status["healthy"] else "✗"
+            print(f"  {health_str} {name}: {status['url']}")
+    except Exception as e:
+        print(f"[STARTUP] Integration health check failed: {e}")
 
     # Keep running
     await asyncio.Event().wait()

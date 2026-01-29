@@ -23,7 +23,7 @@ services:
     environment:
       - PMOVES_DOCKED_MODE=true
       - NATS_URL=${NATS_URL:-nats://nats:4222}
-      - TENSORZERO_BASE_URL=${TENSORZERO_BASE_URL:-http://tensorzero:3000}
+      - TENSORZERO_BASE_URL=${TENSORZERO_BASE_URL:-http://tensorzero-gateway:3030}
     networks:
       - pmoves_api
       - pmoves_app
@@ -37,7 +37,7 @@ services:
     environment:
       - PMOVES_DOCKED_MODE=true
       # Use parent TensorZero for LLM inference
-      - TENSORZERO_BASE_URL=${TENSORZERO_BASE_URL:-http://tensorzero:3000}
+      - TENSORZERO_BASE_URL=${TENSORZERO_BASE_URL:-http://tensorzero-gateway:3030}
       - TENSORZERO_API_KEY=${TENSORZERO_API_KEY:-}
       # NATS for memory event publishing
       - NATS_URL=${NATS_URL:-nats://nats:4222}
@@ -54,7 +54,7 @@ services:
     environment:
       - PMOVES_DOCKED_MODE=true
       - N8N_API_URL=${N8N_API_URL:-http://n8n:5678/api/v1}
-      - TENSORZERO_BASE_URL=${TENSORZERO_BASE_URL:-http://tensorzero:3000}
+      - TENSORZERO_BASE_URL=${TENSORZERO_BASE_URL:-http://tensorzero-gateway:3030}
       - NATS_URL=${NATS_URL:-nats://nats:4222}
     networks:
       - pmoves_api
@@ -91,7 +91,7 @@ services:
   vl-sentinel:
     environment:
       - PMOVES_DOCKED_MODE=true
-      - TENSORZERO_BASE_URL=${TENSORZERO_BASE_URL:-http://tensorzero:3000}
+      - TENSORZERO_BASE_URL=${TENSORZERO_BASE_URL:-http://tensorzero-gateway:3030}
       # Fallback to parent Ollama if local unavailable
       - OLLAMA_BASE_URL=${OLLAMA_BASE_URL:-http://ollama:11434}
     networks:
