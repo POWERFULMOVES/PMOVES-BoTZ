@@ -1,0 +1,45 @@
+# Dockerfile for PMOVES VPN MCP Server
+# Exposes Headscale VPN and RustDesk remote desktop tools via MCP
+
+FROM python:3.11-slim
+
+WORKDIR /app
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy requirements first for better caching
+COPY vpn_mcp_requirements.txt .
+
+# Install Python dependencies
+RUN pip install --no-cache-dir -r vpn_mcp_requirements.txt
+
+# Copy VPN MCP server
+COPY vpn_mcp_server.py .
+
+# Copy configuration directory
+COPY config/ ./config/
+
+# Create non-root user for security
+RUN useradd -m -u 65532 vpnmcp && \
+    chown -R vpnmcp:vpnmcp /app
+
+# Switch to non-root user
+USER vpnmcp
+
+# Expose port for SSE transport
+EXPOSE 8110
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=5s --start-period=5s --retries=3 \
+    CMD python -c "import sys; sys.exit(0)"
+
+# Default environment variables
+ENV MCP_TRANSPORT=stdio \
+    MCP_PORT=8110 \
+    LOG_LEVEL=INFO
+
+# Run the MCP server
+CMD ["python", "vpn_mcp_server.py"]

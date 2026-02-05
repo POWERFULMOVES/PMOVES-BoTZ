@@ -1,0 +1,18 @@
+# PMOVES VPN MCP Server Requirements
+# Python dependencies for VPN and Remote Desktop management
+
+# MCP framework
+mcp>=0.9.0
+
+# HTTP client
+httpx>=0.25.0
+
+# NATS client (optional - for event coordination)
+nats-py>=0.19.0
+
+# SSE transport (for HTTP mode)
+starlette>=0.27.0
+uvicorn>=0.23.0
+
+# Async support
+anyio>=4.0.0

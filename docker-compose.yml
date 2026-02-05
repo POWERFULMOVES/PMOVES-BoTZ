@@ -11,6 +11,7 @@
 #   --profile e2b        - Enable E2B sandbox
 #   --profile ollama     - Enable local Ollama LLM
 #   --profile tools      - Enable docling, metrics tools
+#   --profile vpn        - Enable VPN & Remote Desktop management
 #   --profile all        - Enable all services
 
 version: "3.9"
@@ -252,6 +253,49 @@ services:
       - pmoves_app
     profiles:
       - tools
+
+  # ============================================================================
+  # VPN & REMOTE DESKTOP MANAGEMENT
+  # ============================================================================
+  vpn-mcp:
+    build:
+      context: ./features/vpn_mcp
+      dockerfile: Dockerfile.vpn-mcp
+    container_name: pmoves-botz-vpn-mcp
+    restart: unless-stopped
+    <<: *env-files
+    environment:
+      <<: *common-env
+      # VPN Configuration
+      HEADSCALE_URL: ${HEADSCALE_URL:-http://headscale:8096}
+      HEADSCALE_API_KEY: ${HEADSCALE_API_KEY}
+      RUSTDESK_HBBS_URL: ${RUSTDESK_HBBS_URL:-http://rustdesk-hbbs:21118}
+      # Supabase Integration
+      SUPABASE_URL: ${SUPABASE_URL}
+      SUPABASE_SERVICE_KEY: ${SUPABASE_SERVICE_KEY}
+      # NATS Integration
+      NATS_URL: ${NATS_URL:-nats://nats:4222}
+      NATS_USER: ${NATS_USER:-pmoves}
+      NATS_PASS: ${NATS_PASS:-pmoves}
+      # MCP Configuration
+      MCP_TRANSPORT: ${VPN_MCP_TRANSPORT:-sse}
+      MCP_PORT: ${VPN_MCP_PORT:-8110}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    ports:
+      - "${VPN_MCP_PORT:-8110}:8110"
+    networks:
+      - pmoves_app
+    profiles:
+      - vpn
+      - remote
+    healthcheck:
+      test: ["CMD", "python", "-c", "import sys; sys.exit(0)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
 
 networks:
   pmoves_app:
