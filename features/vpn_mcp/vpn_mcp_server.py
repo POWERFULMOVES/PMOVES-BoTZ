@@ -22,7 +22,7 @@ import logging
 import os
 import sys
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
 # MCP imports
@@ -273,8 +273,8 @@ class VPNMCPServer:
             if expiration:
                 payload["expiration"] = expiration
 
-            # Create key via Headscale API
-            data = await self.call_headscale("POST", "/api/v1/apikey", json=payload)
+            # Create preauth key via Headscale API (for device enrollment)
+            data = await self.call_headscale("POST", "/api/v1/preauthkey", json=payload)
 
             # Publish NATS event
             await self.publish_nats_event("vpn.auth_key.created.v1", {
@@ -282,7 +282,7 @@ class VPNMCPServer:
                 "user": user,
                 "tags": tags,
                 "ephemeral": ephemeral,
-                "created_at": datetime.utcnow().isoformat()
+                "created_at": datetime.now(timezone.utc).isoformat()
             })
 
             # Store in Supabase if not ephemeral
@@ -398,7 +398,7 @@ class VPNMCPServer:
                 "user_id": str(user_id),
                 "target_device": target_device,
                 "connection_type": connection_type,
-                "timestamp": datetime.utcnow().isoformat()
+                "timestamp": datetime.now(timezone.utc).isoformat()
             })
 
             result = {
@@ -446,14 +446,14 @@ class VPNMCPServer:
                     "session_id": f"eq.{session_id}"
                 }, json={
                     "status": "ended",
-                    "ended_at": datetime.utcnow().isoformat()
+                    "ended_at": datetime.now(timezone.utc).isoformat()
                 })
 
             # Publish NATS event
             await self.publish_nats_event("remote.session.ended.v1", {
                 "session_id": session_id,
                 "terminated_by": arguments.get("terminated_by", "user"),
-                "timestamp": datetime.utcnow().isoformat()
+                "timestamp": datetime.now(timezone.utc).isoformat()
             })
 
             result = {
