@@ -1,26 +1,74 @@
 # PMOVES-BoTZ Master Orchestration Config
 # Implements the "BotZ" multi-agent swarm architecture
 # Reference: docs/agents/Aligning AI Agents with Indy Dev Dan.md
+#
+# Deployment Modes:
+#   Standalone: mprocs (uses local Ollama, Cipher Memory)
+#   Docked:     mprocs --env PMOVES_DOCKED_MODE=true (connects to PMOVES.AI)
+#
+# Integration Reference: memory/expertise/pmoves_integration.yaml
 
 procs:
+  # ============================================================================
+  # 0. ENVIRONMENT DETECTION (runs first)
+  # ============================================================================
+  env-check:
+    shell: |
+      echo "=== PMOVES-BoTZ Environment Check ==="
+      if [ "${PMOVES_DOCKED_MODE}" = "true" ]; then
+        echo "Mode: DOCKED (connected to PMOVES.AI)"
+        echo "TensorZero: ${TENSORZERO_BASE_URL:-http://tensorzero-gateway:3030}"
+        echo "NATS: ${NATS_URL:-nats://nats:4222}"
+        echo "HiRAG: ${HIRAG_URL:-http://hirag:8086}"
+      else
+        echo "Mode: STANDALONE"
+        echo "Ollama: ${OLLAMA_HOST:-http://host.docker.internal:11434}"
+        echo "Cipher: stdio via docker exec pmz-cipher"
+      fi
+      echo "==================================="
+    cwd: "."
+    autostart: true
+    autorestart: false
+
+  # ============================================================================
   # 1. THE GATEWAY (The Manager)
+  # ============================================================================
   # Listens for user intent and dispatches tasks.
+  # In docked mode: publishes to NATS for cross-service coordination
   gateway:
-    shell: "echo 'Gateway ready. Awaiting orchestration commands...'"
+    shell: |
+      echo "Gateway ready. Mode: ${PMOVES_DOCKED_MODE:-standalone}"
+      if [ "${PMOVES_DOCKED_MODE}" = "true" ]; then
+        echo "NATS subjects active: botz.gateway.*"
+      fi
+      echo "Awaiting orchestration commands..."
     cwd: "."
     autostart: true
     env:
       MPROCS_SERVER: "127.0.0.1:4050"
       AGENT_ROLE: "gateway"
+      # Docked mode: TensorZero for LLM routing
+      TENSORZERO_BASE_URL: "${TENSORZERO_BASE_URL:-}"
+      # Standalone mode: Direct Ollama
+      OLLAMA_HOST: "${OLLAMA_HOST:-http://host.docker.internal:11434}"
 
+  # ============================================================================
   # 2. THE ARCHITECT (The Brain - Opus 4.5)
+  # ============================================================================
   # Used for high-level planning and "King Mode" reasoning.
   # Reads memory/architecture.md first, outputs PLANS not code.
+  # In docked mode: Uses TensorZero orchestrator function
   architect:
     shell: |
       echo "Architect Agent (Opus 4.5) - Planning Mode"
       echo "Reading: memory/architecture.md"
-      echo "Constraints: security/patterns.yaml"
+      echo "Integration: memory/expertise/pmoves_integration.yaml"
+      echo "Constraints: patterns.yaml"
+      if [ "${PMOVES_DOCKED_MODE}" = "true" ]; then
+        echo "Model: TensorZero/orchestrator (docked)"
+      else
+        echo "Model: Ollama/nemotron-mini (standalone)"
+      fi
       echo "Ready for planning tasks..."
     cwd: "."
     stop: "SIGTERM"
@@ -28,13 +76,25 @@ procs:
       AGENT_ROLE: "architect"
       MODEL: "opus-4-5"
       SKILL_PATH: "skills/botz-orchestrator"
+      # Docked: TensorZero function routing
+      TENSORZERO_FUNCTION: "orchestrator"
+      # Standalone: Ollama model
+      OLLAMA_MODEL: "nemotron-mini"
 
+  # ============================================================================
   # 3. THE BUILDER (The Hands - Sonnet 3.5)
+  # ============================================================================
   # Executes the plans. Runs in sandboxed environment.
+  # Uses E2B sandbox when available, otherwise local Docker
   builder:
     shell: |
       echo "Builder Agent (Sonnet 3.5) - Execution Mode"
-      echo "Sandbox: ACTIVE"
+      echo "Sandbox: ${E2B_API_KEY:+E2B}${E2B_API_KEY:-Docker}"
+      if [ "${PMOVES_DOCKED_MODE}" = "true" ]; then
+        echo "Model: TensorZero/utility (docked)"
+      else
+        echo "Model: Ollama/nemotron-mini (standalone)"
+      fi
       echo "Ready for build tasks..."
     cwd: "."
     env:
@@ -42,57 +102,137 @@ procs:
       MODEL: "sonnet-3-5"
       SKILL_PATH: "skills/code-builder"
       SANDBOX: "true"
+      # E2B sandbox (optional)
+      E2B_API_KEY: "${E2B_API_KEY:-}"
+      # Docked: TensorZero function
+      TENSORZERO_FUNCTION: "utility"
 
+  # ============================================================================
   # 4. THE AUDITOR (The Conscience - Haiku)
+  # ============================================================================
   # Runs probabilistic safety checks on code changes.
+  # Uses security hooks (patterns.yaml + hooks/*.py)
   auditor:
     shell: |
       echo "Auditor Agent (Haiku) - Security Review Mode"
-      echo "Patterns: security/patterns.yaml"
+      echo "Patterns: patterns.yaml"
+      echo "Hooks: hooks/pre_command.py, hooks/prompt_scan.py"
+      echo "Audit log: memory/audit/"
       echo "Ready for security assessments..."
     cwd: "."
     env:
       AGENT_ROLE: "auditor"
       MODEL: "haiku"
       SKILL_PATH: "skills/security-auditor"
+      # Security hooks config
+      PATTERNS_PATH: "patterns.yaml"
+      AUDIT_LOG_PATH: "memory/audit/agent_actions.log"
 
+  # ============================================================================
   # 5. RESEARCHER (The Eyes)
+  # ============================================================================
   # Information gathering and analysis.
+  # In docked mode: Can query HiRAG for knowledge retrieval
   researcher:
     shell: |
       echo "Researcher Agent - Information Gathering Mode"
       echo "Output: memory/research/"
+      if [ "${PMOVES_DOCKED_MODE}" = "true" ]; then
+        echo "HiRAG: ${HIRAG_URL:-http://hirag:8086} (knowledge retrieval)"
+      else
+        echo "Using: Cipher Memory for context"
+      fi
       echo "Ready for research tasks..."
     cwd: "."
     env:
       AGENT_ROLE: "researcher"
       MODEL: "sonnet-3-5"
+      # Docked: HiRAG knowledge retrieval
+      HIRAG_URL: "${HIRAG_URL:-}"
+      # Standalone: Cipher memory
+      CIPHER_CONTAINER: "pmz-cipher"
 
-  # 6. LOG VIEWER
+  # ============================================================================
+  # 6. NATS MONITOR (Docked Mode Only)
+  # ============================================================================
+  # Subscribes to PMOVES.AI event bus for cross-service coordination
+  nats-monitor:
+    shell: |
+      if [ "${PMOVES_DOCKED_MODE}" = "true" ]; then
+        echo "NATS Monitor - Subscribing to botz.* subjects..."
+        echo "NATS URL: ${NATS_URL:-nats://nats:4222}"
+        # In production: nats sub "botz.>" --server ${NATS_URL}
+        echo "Subjects:"
+        echo "  - botz.mcp.tool.executed.v1"
+        echo "  - botz.cipher.memory.stored.v1"
+        echo "  - botz.agent.thread.*.v1"
+        echo "Awaiting messages..."
+      else
+        echo "NATS Monitor disabled (standalone mode)"
+        echo "Set PMOVES_DOCKED_MODE=true to enable"
+      fi
+    cwd: "."
+    autostart: false
+    env:
+      NATS_URL: "${NATS_URL:-nats://nats:4222}"
+
+  # ============================================================================
+  # 7. LOG VIEWER
+  # ============================================================================
   # Tail the audit log for monitoring.
   logs:
     shell: "tail -f memory/audit/agent_actions.log 2>/dev/null || echo 'Awaiting audit logs...'"
     cwd: "."
 
+  # ============================================================================
+  # 8. HEALTH CHECK
+  # ============================================================================
+  # Validates service dependencies based on mode
+  health:
+    shell: |
+      echo "=== Health Check ==="
+      if [ "${PMOVES_DOCKED_MODE}" = "true" ]; then
+        echo "Checking docked dependencies..."
+        curl -sf ${TENSORZERO_BASE_URL:-http://tensorzero-gateway:3030}/health && echo "TensorZero: OK" || echo "TensorZero: FAIL"
+        curl -sf ${HIRAG_URL:-http://hirag:8086}/healthz && echo "HiRAG: OK" || echo "HiRAG: FAIL (optional)"
+      else
+        echo "Checking standalone dependencies..."
+        curl -sf ${OLLAMA_HOST:-http://host.docker.internal:11434}/api/tags && echo "Ollama: OK" || echo "Ollama: FAIL"
+        docker exec pmz-cipher echo "ok" 2>/dev/null && echo "Cipher: OK" || echo "Cipher: FAIL (optional)"
+      fi
+      echo "===================="
+    cwd: "."
+    autostart: false
+    autorestart: false
+
+# ============================================================================
 # Remote Control Server
+# ============================================================================
 # Allows the 'Gateway' to programmatically spawn new agent threads.
 # Enables dynamic Parallel Thread (P) patterns.
 server: "127.0.0.1:4050"
 
+# ============================================================================
 # Keymaps for "In-Loop" Control
+# ============================================================================
 keymap:
   global:
-    "C-g": { c: "focus-proc", name: "gateway" }     # Jump to Gateway
-    "C-a": { c: "focus-proc", name: "architect" }   # Jump to Architect
-    "C-b": { c: "focus-proc", name: "builder" }     # Jump to Builder
-    "C-u": { c: "focus-proc", name: "auditor" }     # Jump to Auditor
-    "C-r": { c: "focus-proc", name: "researcher" }  # Jump to Researcher
-    "C-l": { c: "focus-proc", name: "logs" }        # Jump to Logs
-    "C-s": { c: "start-proc" }                      # Start selected agent
-    "C-x": { c: "term-proc" }                       # Kill selected agent
-    "C-k": { c: "send-keys", keys: "C-c" }          # Send interrupt to agent
+    "C-e": { c: "focus-proc", name: "env-check" }    # Jump to Env Check
+    "C-g": { c: "focus-proc", name: "gateway" }      # Jump to Gateway
+    "C-a": { c: "focus-proc", name: "architect" }    # Jump to Architect
+    "C-b": { c: "focus-proc", name: "builder" }      # Jump to Builder
+    "C-u": { c: "focus-proc", name: "auditor" }      # Jump to Auditor
+    "C-r": { c: "focus-proc", name: "researcher" }   # Jump to Researcher
+    "C-n": { c: "focus-proc", name: "nats-monitor" } # Jump to NATS Monitor
+    "C-l": { c: "focus-proc", name: "logs" }         # Jump to Logs
+    "C-h": { c: "focus-proc", name: "health" }       # Jump to Health
+    "C-s": { c: "start-proc" }                       # Start selected agent
+    "C-x": { c: "term-proc" }                        # Kill selected agent
+    "C-k": { c: "send-keys", keys: "C-c" }           # Send interrupt to agent
 
+# ============================================================================
 # Layout configuration
+# ============================================================================
 layout:
   type: "columns"
   procs:

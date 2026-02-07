@@ -25,13 +25,13 @@ TensorZero 2026.1.1 introduces a restructured configuration format that changes 
 
 **Old Format (Pre-2026.1.1):**
 ```toml
-[[providers.ollama]]
-type = "ollama"
-url = "http://host.docker.internal:11434"
+[models.gpt-4o]
+routing = ["openai-gpt-4o"]
 
-[functions.orchestrator.variants.primary]
-provider = "ollama"
-model = "nemotron-mini"
+[providers.openai-gpt-4o]
+type = "openai"
+model = "gpt-4o"
+api_key = "${env.OPENAI_API_KEY}"
 ```
 
 **New Format (2026.1.1+):**
@@ -47,9 +47,9 @@ api_key_location = "none"
 ```
 
 Key changes:
-- Providers nested under `[models.X.providers.Y]` instead of separate `[[providers.Y]]`
+- Providers are now nested under `[models.X.providers.Y]` instead of separate `[providers.Y]`
 - `model` renamed to `model_name`
-- `api_key` replaced with `api_key_location` (values: `none`, `env::VAR_NAME`)
+- `api_key` replaced with `api_key_location` (values: `none`, `env::VAR_NAME`, `literal::key`)
 - `api_base` used for non-standard endpoints (Ollama, vLLM, etc.)
 
 ### Embedding Models
@@ -57,11 +57,11 @@ Key changes:
 **Old Format:**
 ```toml
 [functions.embed]
-type = "embedding"
+type = "chat"
 
 [functions.embed.variants.primary]
-provider = "ollama"
-model = "qwen2.5:7b"
+type = "chat_completion"
+model = "text-embedding-ada-002"
 ```
 
 **New Format (2026.1.1+):**
@@ -76,16 +76,14 @@ model_name = "qwen2.5:7b"
 api_key_location = "none"
 ```
 
-Embedding models now have their own dedicated `[embedding_models.X]` section.
+Embedding models now have their own dedicated `[embedding_models.X]` section with the same provider nesting pattern as chat models.
 
 ### Function Variants
 
 **Old Format:**
 ```toml
-[functions.orchestrator.variants.primary_cloud]
-provider = "openrouter"
-model = "nvidia/nemotron-4-340b-instruct"
-weight = 1.0
+[functions.agent_chat]
+type = "chat"
 ```
 
 **New Format (2026.1.1+):**
@@ -102,12 +100,13 @@ weight = 1.0
 Variants now require:
 - Explicit `type = "chat_completion"` declaration
 - `model` reference pointing to a `[models.X]` definition
+- Optional `weight` for load balancing (defaults to 1.0)
 
 ---
 
 ## PMOVES-BoTZ Configuration
 
-The current `config/tensorzero.toml` implements the 2026.1.1 schema:
+The current `config/tensorzero.toml` implements the 2026.1.1 schema with the following architecture:
 
 ### Primary: Local Ollama (Standalone Mode)
 
@@ -136,7 +135,7 @@ api_key_location = "none"
 # api_key_location = "env::OPENROUTER_API_KEY"
 ```
 
-To enable cloud fallback, update routing:
+To enable cloud fallback, update routing and uncomment the provider:
 ```toml
 [models.orchestrator]
 routing = ["ollama", "openrouter"]
@@ -155,6 +154,8 @@ model_name = "qwen2.5:7b"
 api_key_location = "none"
 ```
 
+Uses local Ollama with Qwen 2.5:7b for embeddings, avoiding external API costs.
+
 ---
 
 ## Configuration File Location
@@ -162,7 +163,7 @@ api_key_location = "none"
 ```
 PMOVES-BoTZ/
 └── config/
-    └── tensorzero.toml
+    └── tensorzero.toml    # Active TensorZero configuration
 ```
 
 ---
@@ -178,11 +179,11 @@ PMOVES-BoTZ/
 
 ## Validation
 
-After modifying `tensorzero.toml`:
+After modifying `tensorzero.toml`, validate the configuration:
 
 ```bash
-# Restart TensorZero
-docker restart pmz-tensorzero
+# Start TensorZero with new config
+docker compose up tensorzero
 
 # Check logs for config errors
 docker logs pmz-tensorzero 2>&1 | grep -i error
@@ -193,16 +194,17 @@ docker logs pmz-tensorzero 2>&1 | grep -i error
 ## Reference Links
 
 - TensorZero Documentation: https://www.tensorzero.com/docs
-- PMOVES-tensorzero PR #1: https://github.com/POWERFULMOVES/PMOVES-tensorzero/pull/1
+- PMOVES-tensorzero Schema Migration PR: https://github.com/POWERFULMOVES/PMOVES-tensorzero/pull/1
+- TensorZero Configuration Reference: https://www.tensorzero.com/docs/gateway/configuration
 
 ---
 
 ## Migration Checklist
 
-- [x] Update `[[providers.X]]` to `[models.X.providers.Y]` nesting
-- [x] Rename `model` to `model_name` in provider configs
-- [x] Replace `api_key` with `api_key_location`
-- [x] Move embedding configs to `[embedding_models.X]` section
-- [x] Add `type = "chat_completion"` to all function variants
-- [x] Verify `routing` arrays reference correct provider names
-- [x] Test with local Ollama before enabling cloud fallback
+- [ ] Update `[providers.X]` to `[models.X.providers.Y]` nesting
+- [ ] Rename `model` to `model_name` in provider configs
+- [ ] Replace `api_key` with `api_key_location`
+- [ ] Move embedding configs to `[embedding_models.X]` section
+- [ ] Add `type = "chat_completion"` to all function variants
+- [ ] Verify `routing` arrays reference correct provider names
+- [ ] Test with local Ollama before enabling cloud fallback

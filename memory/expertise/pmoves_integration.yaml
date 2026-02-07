@@ -1,0 +1,357 @@
+# PMOVES-BoTZ Integration Patterns
+# Dynamic expertise file - agents use this to understand docked vs standalone modes
+# Reference: https://github.com/POWERFULMOVES/PMOVES.AI
+
+version: "1.0.0"
+last_updated: "2026-01-27"
+
+# ============================================================================
+# Deployment Modes
+# ============================================================================
+
+modes:
+  docked:
+    description: "Running as part of PMOVES.AI docker-compose cluster"
+    detection:
+      - "PMOVES_DOCKED_MODE=true environment variable"
+      - "NATS_URL pointing to pmoves_bus network (172.30.3.x)"
+      - "TENSORZERO_BASE_URL available"
+    services:
+      tensorzero:
+        url: "${TENSORZERO_BASE_URL:-http://tensorzero-gateway:3030}"
+        purpose: "LLM inference and embeddings"
+        fallback: null  # Required in docked mode
+      hirag:
+        url: "${HIRAG_URL:-http://hirag:8086}"
+        purpose: "Knowledge retrieval"
+        fallback: "cipher-memory"
+      nats:
+        url: "${NATS_URL:-nats://nats:4222}"
+        purpose: "Event bus for agent coordination"
+        fallback: null  # Required in docked mode
+      supabase:
+        url: "${SUPABASE_URL:-http://kong:8000}"
+        purpose: "Auth and database"
+        fallback: "local-sqlite"
+      qdrant:
+        url: "${QDRANT_URL:-http://qdrant:6333}"
+        purpose: "Vector storage"
+        fallback: "cipher-memory"
+      minio:
+        url: "${MINIO_URL:-http://minio:9000}"
+        purpose: "Object storage"
+        fallback: "local-fs"
+
+  standalone:
+    description: "Running independently with local alternatives"
+    detection:
+      - "PMOVES_DOCKED_MODE unset or false"
+      - "OLLAMA_HOST available (http://host.docker.internal:11434)"
+    services:
+      ollama:
+        url: "${OLLAMA_HOST:-http://host.docker.internal:11434}"
+        purpose: "Local LLM inference"
+        models:
+          - "nemotron-mini"  # Default utility model
+          - "qwen3-embedding:8b"  # Embeddings
+      cipher_memory:
+        transport: "stdio"
+        container: "pmz-cipher"
+        purpose: "Dual-layer memory (System 1 + System 2)"
+      mcp_gateway:
+        url: "http://localhost:2091"
+        purpose: "Tool routing and aggregation"
+      local_fs:
+        path: "./data"
+        purpose: "File-based storage"
+
+# ============================================================================
+# Network Topology
+# ============================================================================
+
+networks:
+  docked:
+    # Parent PMOVES.AI networks (external: true)
+    pmoves_api:
+      subnet: "172.30.1.0/24"
+      tier: "api"
+      purpose: "Public-facing services"
+    pmoves_app:
+      subnet: "172.30.2.0/24"
+      tier: "app"
+      purpose: "Internal application services"
+    pmoves_bus:
+      subnet: "172.30.3.0/24"
+      tier: "bus"
+      purpose: "NATS message bus"
+    pmoves_data:
+      subnet: "172.30.4.0/24"
+      tier: "data"
+      purpose: "Databases and storage"
+
+  standalone:
+    # Local BoTZ networks (internal)
+    pmoves_api:
+      subnet: "172.31.1.0/24"
+      tier: "api"
+    pmoves_app:
+      subnet: "172.31.2.0/24"
+      tier: "app"
+    pmoves_bus:
+      subnet: "172.31.3.0/24"
+      tier: "bus"
+    pmoves_data:
+      subnet: "172.31.4.0/24"
+      tier: "data"
+    pmoves_monitoring:
+      subnet: "172.31.5.0/24"
+      tier: "monitoring"
+
+# ============================================================================
+# Service Discovery Patterns
+# ============================================================================
+
+discovery:
+  resolution_chain:
+    - step: 1
+      name: "Environment Variable"
+      pattern: "${SERVICE}_URL or ${SERVICE}-URL or ${SERVICE}URL"
+      example: "TENSORZERO_URL, HIRAG_URL"
+    - step: 2
+      name: "Docker DNS"
+      pattern: "http://${service_name}:${port}"
+      example: "http://tensorzero-gateway:3030"
+    - step: 3
+      name: "Health Check Validation"
+      pattern: "GET /healthz or /health"
+      timeout: "5s"
+
+  service_announcement:
+    subject: "services.announce.v1"
+    payload:
+      slug: "botz-{feature}"
+      name: "PMOVES-BoTZ {Feature}"
+      url: "http://{hostname}:{port}"
+      tier: "agent|api|worker"
+      metadata:
+        version: "1.0.0"
+        features: ["mcp", "cipher", "docling"]
+
+# ============================================================================
+# NATS Event Subjects
+# ============================================================================
+
+nats_subjects:
+  agent_events:
+    - subject: "botz.mcp.tool.executed.v1"
+      purpose: "MCP tool execution telemetry"
+      payload: ["tool_name", "duration_ms", "success", "agent_role"]
+
+    - subject: "botz.cipher.memory.stored.v1"
+      purpose: "Memory item stored"
+      payload: ["key", "content_hash", "layer"]
+
+    - subject: "botz.cipher.memory.recalled.v1"
+      purpose: "Memory item recalled"
+      payload: ["query", "matches_count", "latency_ms"]
+
+    - subject: "botz.agent.thread.started.v1"
+      purpose: "Agent thread lifecycle start"
+      payload: ["thread_id", "agent_role", "task_type"]
+
+    - subject: "botz.agent.thread.completed.v1"
+      purpose: "Agent thread lifecycle end"
+      payload: ["thread_id", "result", "duration_ms"]
+
+  orchestration:
+    - subject: "botz.gateway.task.dispatched.v1"
+      purpose: "Gateway dispatched task to agent"
+      payload: ["task_id", "target_agent", "task_type"]
+
+    - subject: "botz.architect.plan.created.v1"
+      purpose: "Architect created thread plan"
+      payload: ["plan_id", "task_count", "thread_type"]
+
+# ============================================================================
+# Health Check Patterns
+# ============================================================================
+
+health_checks:
+  standard:
+    endpoint: "/healthz"  # Most services; TensorZero uses /health
+    method: "GET"
+    interval: "30s"
+    timeout: "5s"
+    success_codes: [200]
+    response_schema:
+      status: "healthy|degraded|unhealthy"
+      checks:
+        - name: "string"
+          status: "pass|fail"
+          optional: "boolean"
+
+  dependencies:
+    required:
+      - name: "ollama"
+        check: "GET ${OLLAMA_HOST}/api/tags"
+        mode: "standalone"
+      - name: "tensorzero"
+        check: "GET ${TENSORZERO_BASE_URL}/health"
+        mode: "docked"
+
+    optional:
+      - name: "nats"
+        check: "nats-ping ${NATS_URL}"
+        mode: "docked"
+      - name: "cipher-memory"
+        check: "docker exec pmz-cipher python3 -c 'print(1)'"
+        mode: "standalone"
+
+# ============================================================================
+# MCP Catalog Integration
+# ============================================================================
+
+mcp_integration:
+  catalog_path: "core/mcp/catalog.yml"
+
+  transport_patterns:
+    sse:
+      description: "Server-Sent Events for streaming"
+      url_pattern: "http://localhost:{port}/sse"
+      features: ["cipher-memory", "docling", "e2b", "vl-sentinel"]
+
+    stdio:
+      description: "Docker exec for container tools"
+      command_pattern: "docker exec -i {container} {entrypoint}"
+      features: ["postman", "n8n-agent", "hostinger"]
+
+    http:
+      description: "REST API for gateway"
+      url_pattern: "http://localhost:{port}"
+      features: ["mcp-gateway"]
+
+  mode_switching:
+    docked:
+      tensorzero_model: "orchestrator"  # Routes to parent TensorZero
+      embedding_model: "qwen3_embed"  # Uses parent embedding service
+    standalone:
+      tensorzero_model: "nemotron_mini"  # Local Ollama
+      embedding_model: "qwen_embed"  # Local embedding
+
+# ============================================================================
+# Cross-Repository Awareness
+# ============================================================================
+
+cross_repo:
+  pmoves_ai:
+    repo: "https://github.com/POWERFULMOVES/PMOVES.AI"
+    branch: "main"
+    relation: "parent"
+    services_provided: ["tensorzero", "hirag", "nats", "supabase", "qdrant"]
+
+  pmoves_dox:
+    repo: "local:PMOVES-DoX"
+    branch: "main"
+    relation: "sibling (via submodule)"
+    features: ["document-ingestion", "geometry-engine", "chit-service"]
+
+  pmoves_botz:
+    repo: "https://github.com/POWERFULMOVES/PMOVES-BoTZ"
+    branch: "PMOVES.AI-Edition-Hardened"
+    relation: "self"
+    features: ["mcp-catalog", "cipher-memory", "security-hooks"]
+
+  pmoves_botz_gateway:
+    repo: "local:external/PMOVES-BotZ-gateway"
+    branch: "main"
+    relation: "submodule"
+    features: ["tool-routing", "request-aggregation"]
+
+# ============================================================================
+# Environment Configuration
+# ============================================================================
+
+env_templates:
+  docked:
+    required:
+      - PMOVES_DOCKED_MODE=true
+      - TENSORZERO_BASE_URL
+      - NATS_URL
+      - SUPABASE_URL
+      - SUPABASE_JWT_SECRET
+    optional:
+      - HIRAG_URL
+      - QDRANT_URL
+      - MINIO_URL
+
+  standalone:
+    required:
+      - OLLAMA_HOST
+    optional:
+      - VENICE_API_KEY  # For large model fallback
+      - E2B_API_KEY  # For code sandbox
+      - POSTMAN_API_KEY  # For API testing
+      - N8N_API_KEY  # For workflow automation
+
+# ============================================================================
+# Learned Integration Patterns
+# ============================================================================
+
+patterns:
+  - id: "int-001"
+    name: "Dual-Write Architecture"
+    description: "Write to local first, then non-blocking write to parent"
+    use_case: "Cipher memory sync in docked mode"
+    example: |
+      async def store_memory(key, content):
+          # Primary write (always local)
+          await cipher.store(key, content)
+          # Secondary write (docked mode only, non-blocking)
+          if DOCKED_MODE:
+              asyncio.create_task(nats.publish("botz.cipher.memory.stored.v1", {key, content}))
+
+  - id: "int-002"
+    name: "Graceful Degradation"
+    description: "Fall back to local alternatives when parent unavailable"
+    use_case: "TensorZero timeout handling"
+    example: |
+      async def get_embedding(text):
+          if DOCKED_MODE:
+              try:
+                  return await tensorzero.embed(text, timeout=5)
+              except TimeoutError:
+                  logger.warn("TensorZero timeout, using local Ollama")
+          return await ollama.embed(text)
+
+  - id: "int-003"
+    name: "Service Tier Isolation"
+    description: "Place services in appropriate network tiers"
+    use_case: "Docker compose network assignment"
+    example: |
+      # Expose only to api tier
+      networks:
+        pmoves_api:
+          aliases: ["my-service"]
+      # Internal services on app tier
+      networks:
+        pmoves_app:
+          aliases: ["my-internal-service"]
+
+# ============================================================================
+# Incidents & Lessons
+# ============================================================================
+
+incidents:
+  - id: "int-inc-001"
+    date: "2026-01-27"
+    type: "Network Misconfiguration"
+    description: "Services couldn't resolve parent when external network not attached"
+    resolution: "Added 'external: true' to all pmoves_* networks in docked compose"
+    lesson: "Always verify network attachment before testing docked mode"
+
+  - id: "int-inc-002"
+    date: "2026-01-27"
+    type: "Environment Detection Failure"
+    description: "PMOVES_DOCKED_MODE check failed when variable was empty string"
+    resolution: "Changed check from 'if DOCKED_MODE' to 'if DOCKED_MODE == \"true\"'"
+    lesson: "Always compare to explicit value, never trust falsy checks"

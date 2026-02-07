@@ -74,7 +74,7 @@ mcpServers:
     env:
       N8N_API_KEY: ${N8N_API_KEY}
       N8N_API_URL: ${N8N_API_URL:-http://n8n:5678/api/v1}
-      TENSORZERO_BASE_URL: ${TENSORZERO_BASE_URL:-http://tensorzero:3000}
+      TENSORZERO_BASE_URL: ${TENSORZERO_BASE_URL:-http://tensorzero-gateway:3030}
 
   # Hostinger VPS/DNS/Domain Management
   hostinger:
@@ -86,3 +86,14 @@ mcpServers:
       - hostinger-api-mcp
     env:
       API_TOKEN: ${HOSTINGER_API_KEY}
+
+  # VPN & Remote Desktop Management
+  # Headscale VPN (self-hosted Tailscale) + RustDesk remote desktop coordination
+  vpn-manager:
+    url: ${VPN_MANAGER_URL:-http://localhost:8110/sse}
+    transport: sse
+    description: |
+      VPN and remote desktop management tools.
+      Tools: vpn_list_nodes, vpn_create_auth_key, vpn_advertise_route,
+             remote_start_session, remote_end_session, remote_list_sessions.
+      Integrates: Headscale (VPN), RustDesk (remote desktop), Supabase (logging), NATS (events).

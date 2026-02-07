@@ -11,6 +11,11 @@ RUN npm install -g hostinger-api-mcp@latest
 COPY entrypoint.sh /app/entrypoint.sh
 RUN chmod +x /app/entrypoint.sh
 
+# Create non-root user
+RUN useradd -m -u 1000 -s /bin/bash appuser && \
+    chown -R appuser:appuser /app
+USER appuser
+
 # Environment variables
 ENV API_TOKEN=""
 
