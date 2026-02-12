@@ -1,15 +1,19 @@
 [submodule "pmoves_multi_agent_pro_pack/docling"]
 	path = pmoves_multi_agent_pro_pack/docling
 	url = https://github.com/POWERFULMOVES/docling.git
+	branch = PMOVES.AI-Edition-Hardened
 [submodule "pmoves_multi_agent_pro_pack/mcp_gateway/PMOVES-BotZ-gateway"]
 	path = pmoves_multi_agent_pro_pack/mcp_gateway/PMOVES-BotZ-gateway
 	url = https://github.com/POWERFULMOVES/PMOVES-BotZ-gateway.git
+	branch = PMOVES.AI-Edition-Hardened
 [submodule "features/cipher/pmoves_cipher"]
 	path = features/cipher/pmoves_cipher
 	url = https://github.com/POWERFULMOVES/Pmoves-cipher.git
+	branch = PMOVES.AI-Edition-Hardened
 [submodule "PMOVES-awesome-agent-skills"]
 	path = PMOVES-awesome-agent-skills
 	url = https://github.com/POWERFULMOVES/PMOVES-awesome-agent-skills.git
+	branch = PMOVES.AI-Edition-Hardened
 [submodule "features/skills/repos/anthropics-skills"]
 	path = features/skills/repos/anthropics-skills
 	url = https://github.com/anthropics/skills.git
