@@ -26,7 +26,7 @@ ENV PORT=8100
 ENV HOST=0.0.0.0
 ENV TENSORZERO_URL=http://tensorzero:3030
 ENV HIRAG_URL=http://hi-rag-gateway-v2:8086
-ENV NATS_URL=nats://nats:4222
+ENV NATS_URL=nats://nats:pmoves@nats:4222
 ENV SUPABASE_URL=http://supabase:3010
 
 EXPOSE 8100

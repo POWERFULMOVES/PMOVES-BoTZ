@@ -18,7 +18,7 @@ procs:
       if [ "${PMOVES_DOCKED_MODE}" = "true" ]; then
         echo "Mode: DOCKED (connected to PMOVES.AI)"
         echo "TensorZero: ${TENSORZERO_BASE_URL:-http://tensorzero-gateway:3030}"
-        echo "NATS: ${NATS_URL:-nats://nats:4222}"
+        echo "NATS: ${NATS_URL:-nats://nats:pmoves@nats:4222}"
         echo "HiRAG: ${HIRAG_URL:-http://hirag:8086}"
       else
         echo "Mode: STANDALONE"
@@ -160,7 +160,7 @@ procs:
     shell: |
       if [ "${PMOVES_DOCKED_MODE}" = "true" ]; then
         echo "NATS Monitor - Subscribing to botz.* subjects..."
-        echo "NATS URL: ${NATS_URL:-nats://nats:4222}"
+        echo "NATS URL: ${NATS_URL:-nats://nats:pmoves@nats:4222}"
         # In production: nats sub "botz.>" --server ${NATS_URL}
         echo "Subjects:"
         echo "  - botz.mcp.tool.executed.v1"
@@ -174,7 +174,7 @@ procs:
     cwd: "."
     autostart: false
     env:
-      NATS_URL: "${NATS_URL:-nats://nats:4222}"
+      NATS_URL: "${NATS_URL:-nats://nats:pmoves@nats:4222}"
 
   # ============================================================================
   # 7. LOG VIEWER

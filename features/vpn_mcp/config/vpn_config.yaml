@@ -19,7 +19,7 @@ supabase:
 
 # NATS configuration
 nats:
-  url: ${NATS_URL:-nats://nats:4222}
+  url: ${NATS_URL:-nats://nats:pmoves@nats:4222}
   user: ${NATS_USER:-pmoves}
   pass: ${NATS_PASS:-pmoves}
 
