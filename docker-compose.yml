@@ -74,7 +74,7 @@ services:
       TENSORZERO_URL: ${TENSORZERO_URL:-http://host.docker.internal:3030}
       HIRAG_URL: ${HIRAG_URL:-http://host.docker.internal:8086}
       SUPASERCH_URL: ${SUPASERCH_URL:-http://host.docker.internal:8099}
-      NATS_URL: ${NATS_URL:-nats://host.docker.internal:4222}
+      NATS_URL: ${NATS_URL:-nats://nats:pmoves@host.docker.internal:4222}
       SUPABASE_URL: ${SUPABASE_URL:-http://host.docker.internal:3010}
       SUPABASE_ANON_KEY: ${SUPABASE_ANON_KEY:-}
       SUPABASE_SERVICE_KEY: ${SUPABASE_SERVICE_KEY:-}
@@ -274,7 +274,7 @@ services:
       SUPABASE_URL: ${SUPABASE_URL}
       SUPABASE_SERVICE_KEY: ${SUPABASE_SERVICE_KEY}
       # NATS Integration
-      NATS_URL: ${NATS_URL:-nats://nats:4222}
+      NATS_URL: ${NATS_URL:-nats://nats:pmoves@nats:4222}
       NATS_USER: ${NATS_USER:-pmoves}
       NATS_PASS: ${NATS_PASS:-pmoves}
       # MCP Configuration

@@ -29,7 +29,7 @@ except ImportError:
     HAS_NATS = False
     NATSClient = None
 
-NATS_URL = os.getenv("NATS_URL", "nats://localhost:4222")
+NATS_URL = os.getenv("NATS_URL", "nats://nats:pmoves@localhost:4222")
 
 
 # Tool definitions

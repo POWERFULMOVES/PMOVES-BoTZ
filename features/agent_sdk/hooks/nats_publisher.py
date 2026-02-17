@@ -45,7 +45,7 @@ class NATSPublisherHook:
         nats_url: NATS server URL
     """
 
-    NATS_URL = os.getenv("NATS_URL", "nats://localhost:4222")
+    NATS_URL = os.getenv("NATS_URL", "nats://nats:pmoves@localhost:4222")
 
     def __init__(self, agent_id: str):
         """
@@ -221,7 +221,7 @@ def main():
 
         async def publish():
             try:
-                client = await nats.connect(os.getenv("NATS_URL", "nats://localhost:4222"))
+                client = await nats.connect(os.getenv("NATS_URL", "nats://nats:pmoves@localhost:4222"))
                 subject = f"agent.tool.{args.phase}.v1"
                 await client.publish(subject, json.dumps(event).encode())
                 await client.close()
