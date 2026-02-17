@@ -65,7 +65,7 @@ HEADSCALE_API_KEY = os.getenv("HEADSCALE_API_KEY", "")
 RUSTDESK_HBBS_URL = os.getenv("RUSTDESK_HBBS_URL", "http://rustdesk-hbbs:21118")
 SUPABASE_URL = os.getenv("SUPABASE_URL", "")
 SUPABASE_SERVICE_KEY = os.getenv("SUPABASE_SERVICE_KEY", "")
-NATS_URL = os.getenv("NATS_URL", "nats://nats:4222")
+NATS_URL = os.getenv("NATS_URL", "nats://nats:pmoves@nats:4222")
 NATS_USER = os.getenv("NATS_USER", "pmoves")
 NATS_PASS = os.getenv("NATS_PASS", "pmoves")
 
