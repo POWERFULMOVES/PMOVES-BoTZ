@@ -86,7 +86,8 @@ config = SFTConfig(
     # Monitoring
     report_to="trackio",  # Integrate with Trackio
     project="meaningful_project_name", # project name for the training name (trackio)
-    run_name="baseline-run", #Descriptive name for this training run
+    run_name="baseline-run",  # Descriptive name for this training run
+)
 
 # LoRA configuration
 peft_config = LoraConfig(
