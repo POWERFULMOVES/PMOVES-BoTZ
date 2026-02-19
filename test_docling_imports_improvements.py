@@ -199,8 +199,8 @@ if success:
 else:
     print("SOME TESTS FAILED! Please review the implementation.")
 print(f"{'='*60}")
-    
-    if success:
-        sys.exit(0)
-    else:
-        sys.exit(1)
+
+if success:
+    sys.exit(0)
+else:
+    sys.exit(1)
