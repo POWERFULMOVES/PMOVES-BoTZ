@@ -13,6 +13,7 @@ Also provides A2A (Agent-to-Agent) protocol endpoints:
 import asyncio
 import base64
 import hashlib
+import hmac
 import json
 import logging
 import os
@@ -346,8 +347,10 @@ class GatewayHTTPHandler(BaseHTTPRequestHandler):
             "endpoint": endpoint,
             "agent_id": agent_id,
             "timestamp": ts,
-            "proof": hashlib.sha256(
-                f"{SUPABASE_JWT_SECRET}:{endpoint}:{agent_id}:{ts}".encode()
+            "proof": hmac.new(
+                SUPABASE_JWT_SECRET.encode(),
+                f"{endpoint}:{agent_id}:{ts}".encode(),
+                hashlib.sha256
             ).hexdigest()[:16],
         }
         return base64.b64encode(json.dumps(attestation).encode()).decode()
@@ -434,8 +437,11 @@ class GatewayHTTPHandler(BaseHTTPRequestHandler):
                     REQUEST_COUNT.labels('GET', '/metrics').inc()
                 return
 
-            # A2A Agent Card discovery endpoint
+            # A2A Agent Card discovery endpoint — auth-gated to prevent topology leak
             if self.path == '/.well-known/agent.json':
+                jwt_payload = self._require_auth()
+                if jwt_payload is None:
+                    return
                 if self.a2a_enabled:
                     tools = self.gateway.get_all_tools()
                     card = get_agent_card(self.gateway.upstream_servers, tools)
@@ -458,8 +464,11 @@ class GatewayHTTPHandler(BaseHTTPRequestHandler):
                     REQUEST_COUNT.labels('GET', self.path).inc()
                 return
 
-            # A2A task info (GET)
+            # A2A task info (GET) — protected
             if self.path.startswith('/a2a/v1/tasks/') and self.a2a_task_handler:
+                jwt_payload = self._require_auth()
+                if jwt_payload is None:
+                    return
                 task_id = self.path.split('/')[4]
                 result = self.a2a_task_handler.handle_jsonrpc({
                     "jsonrpc": "2.0",
@@ -485,12 +494,18 @@ class GatewayHTTPHandler(BaseHTTPRequestHandler):
                     REQUEST_COUNT.labels('GET', '/health').inc()
 
             elif self.path == '/servers':
+                jwt_payload = self._require_auth()
+                if jwt_payload is None:
+                    return
                 servers = self.gateway.list_upstream_servers()
                 self._send_json(200, {"servers": servers})
                 if REQUEST_COUNT:
                     REQUEST_COUNT.labels('GET', '/servers').inc()
 
             elif self.path == '/tools':
+                jwt_payload = self._require_auth()
+                if jwt_payload is None:
+                    return
                 tools = self.gateway.get_all_tools()
                 self._send_json(200, {
                     "tools": tools,
@@ -500,6 +515,9 @@ class GatewayHTTPHandler(BaseHTTPRequestHandler):
                     REQUEST_COUNT.labels('GET', '/tools').inc()
 
             elif self.path.startswith('/tools/'):
+                jwt_payload = self._require_auth()
+                if jwt_payload is None:
+                    return
                 server_name = self.path.split('/')[2]
                 tools = self.gateway.get_tools_from_server(server_name)
                 self._send_json(200, {

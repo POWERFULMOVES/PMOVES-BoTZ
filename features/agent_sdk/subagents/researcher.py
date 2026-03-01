@@ -53,7 +53,7 @@ class ResearcherAgent:
     HIRAG_URL = os.getenv("HIRAG_URL", "http://localhost:8086")
     SUPASERCH_URL = os.getenv("SUPASERCH_URL", "http://localhost:8099")
     DEEPRESEARCH_URL = os.getenv("DEEPRESEARCH_URL", "http://localhost:8098")
-    NATS_URL = os.getenv("NATS_URL", "nats://localhost:4222")
+    NATS_URL = os.getenv("NATS_URL", "nats://nats:pmoves@nats:4222")
 
     def __init__(self, agent_id: str):
         """

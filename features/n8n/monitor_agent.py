@@ -134,7 +134,7 @@ class MonitorAgent:
     """NATS-based monitor agent for tracking learnings."""
 
     def __init__(self) -> None:
-        self.nats_url = os.environ.get("NATS_URL", "nats://localhost:4222")
+        self.nats_url = os.environ.get("NATS_URL", "nats://nats:pmoves@nats:4222")
         self.nc: Optional[NATSClient] = None
         self.llm = TensorZeroClient()
         self.store = LearningStore()

@@ -59,7 +59,7 @@ class MediaProcessorAgent:
     VIDEO_ANALYZER_URL = os.getenv("VIDEO_ANALYZER_URL", "http://localhost:8079")
     AUDIO_ANALYZER_URL = os.getenv("AUDIO_ANALYZER_URL", "http://localhost:8082")
     EXTRACT_WORKER_URL = os.getenv("EXTRACT_WORKER_URL", "http://localhost:8083")
-    NATS_URL = os.getenv("NATS_URL", "nats://localhost:4222")
+    NATS_URL = os.getenv("NATS_URL", "nats://nats:pmoves@nats:4222")
 
     def __init__(self, agent_id: str):
         """
