@@ -55,8 +55,10 @@ def validate_jwt_token(token: str) -> Tuple[bool, Optional[Dict[str, Any]], str]
         return False, None, "MISSING_TOKEN"
 
     if not HAS_JOSE:
-        # If python-jose is not installed, skip validation
-        return True, None, "VALIDATION_UNAVAILABLE"
+        raise HTTPException(
+            status_code=500,
+            detail="python-jose not installed — JWT validation unavailable"
+        )
 
     if not JWT_SECRET:
         raise HTTPException(

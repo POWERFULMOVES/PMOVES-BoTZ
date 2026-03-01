@@ -26,13 +26,13 @@ class EventPublisher:
     Publishes events to NATS for observability and coordination.
 
     Usage:
-        publisher = EventPublisher(nats_url="nats://localhost:4222")
+        publisher = EventPublisher(nats_url="nats://nats:pmoves@nats:4222")
         await publisher.connect()
         await publisher.publish("botz.agent.started.v1", {"agent_id": "..."})
         await publisher.disconnect()
     """
 
-    def __init__(self, nats_url: str = "nats://localhost:4222"):
+    def __init__(self, nats_url: str = "nats://nats:pmoves@nats:4222"):
         """
         Initialize Event Publisher.
 

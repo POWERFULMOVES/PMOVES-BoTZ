@@ -79,7 +79,7 @@ class PMOVESAgent:
     # Default PMOVES service endpoints
     TENSORZERO_URL = os.getenv("TENSORZERO_URL", "http://localhost:3030")
     HIRAG_URL = os.getenv("HIRAG_URL", "http://localhost:8086")
-    NATS_URL = os.getenv("NATS_URL", "nats://localhost:4222")
+    NATS_URL = os.getenv("NATS_URL", "nats://nats:pmoves@nats:4222")
     SUPABASE_URL = os.getenv("SUPABASE_URL", "http://localhost:3010")
     AGENT_ZERO_URL = os.getenv("AGENT_ZERO_URL", "http://localhost:8080")
 
