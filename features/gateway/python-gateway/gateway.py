@@ -437,8 +437,11 @@ class GatewayHTTPHandler(BaseHTTPRequestHandler):
                     REQUEST_COUNT.labels('GET', '/metrics').inc()
                 return
 
-            # A2A Agent Card discovery endpoint
+            # A2A Agent Card discovery endpoint — auth-gated to prevent topology leak
             if self.path == '/.well-known/agent.json':
+                jwt_payload = self._require_auth()
+                if jwt_payload is None:
+                    return
                 if self.a2a_enabled:
                     tools = self.gateway.get_all_tools()
                     card = get_agent_card(self.gateway.upstream_servers, tools)
