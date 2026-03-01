@@ -33,6 +33,17 @@ from .types import TaskState
 
 logger = logging.getLogger(__name__)
 
+JWT_ALGORITHM = os.environ.get("JWT_ALGORITHM", "HS256")
+SUPABASE_JWT_SECRET = os.environ.get("SUPABASE_JWT_SECRET", "").strip()
+
+try:
+    from jose import jwt as jose_jwt
+
+    HAS_JOSE = True
+except Exception:
+    jose_jwt = None
+    HAS_JOSE = False
+
 
 class A2AHTTPHandler(BaseHTTPRequestHandler):
     """HTTP handler for A2A protocol endpoints."""
@@ -42,6 +53,52 @@ class A2AHTTPHandler(BaseHTTPRequestHandler):
     task_handler: TaskHandler = None
     sse_queues: Dict[str, queue.Queue] = {}
     sse_lock = threading.Lock()
+
+    def _require_auth(self) -> Optional[Dict]:
+        """Validate Supabase JWT on protected endpoints (fail-closed)."""
+        if not HAS_JOSE:
+            self._send_json(500, {"error": "python-jose not installed - JWT validation unavailable"})
+            logger.error("python-jose not installed - rejecting request (fail-closed)")
+            return None
+
+        if not SUPABASE_JWT_SECRET:
+            self._send_json(500, {"error": "SUPABASE_JWT_SECRET not configured - authentication unavailable"})
+            logger.error("SUPABASE_JWT_SECRET not set - rejecting request (fail-closed)")
+            return None
+
+        auth_header = self.headers.get("Authorization", "")
+        if not auth_header:
+            self._send_json(401, {"error": "Missing Authorization header"})
+            return None
+
+        token = auth_header[7:] if auth_header.startswith("Bearer ") else auth_header
+        token = token.strip()
+        if not token:
+            self._send_json(401, {"error": "Empty token"})
+            return None
+
+        try:
+            payload = jose_jwt.decode(
+                token,
+                SUPABASE_JWT_SECRET,
+                algorithms=[JWT_ALGORITHM],
+                options={"verify_signature": True, "verify_aud": False, "verify_exp": True},
+            )
+        except jose_jwt.ExpiredSignatureError:
+            self._send_json(401, {"error": "Token expired"})
+            return None
+        except jose_jwt.InvalidSignatureError:
+            self._send_json(403, {"error": "Invalid token signature"})
+            return None
+        except jose_jwt.JWTError as exc:
+            self._send_json(403, {"error": f"JWT validation failed: {exc}"})
+            return None
+
+        if payload.get("role", "") == "anon":
+            self._send_json(403, {"error": "Anonymous keys are not permitted"})
+            return None
+
+        return payload
 
     def _send_json(self, status: int, data: Dict) -> None:
         """Send JSON response."""
@@ -72,6 +129,8 @@ class A2AHTTPHandler(BaseHTTPRequestHandler):
         """Handle GET requests."""
         # Agent Card discovery endpoint
         if self.path == "/.well-known/agent.json":
+            if self._require_auth() is None:
+                return
             if self.agent_card_provider:
                 card = self.agent_card_provider()
                 self._send_json(200, card)
@@ -91,12 +150,16 @@ class A2AHTTPHandler(BaseHTTPRequestHandler):
 
         # SSE streaming endpoint for task updates
         if self.path.startswith("/a2a/v1/tasks/") and self.path.endswith("/stream"):
+            if self._require_auth() is None:
+                return
             task_id = self.path.split("/")[4]
             self._handle_sse_stream(task_id)
             return
 
         # Task info (GET)
         if self.path.startswith("/a2a/v1/tasks/"):
+            if self._require_auth() is None:
+                return
             task_id = self.path.split("/")[4]
             if self.task_handler:
                 result = self.task_handler.handle_jsonrpc({
@@ -117,6 +180,10 @@ class A2AHTTPHandler(BaseHTTPRequestHandler):
 
     def do_POST(self) -> None:
         """Handle POST requests."""
+        if self.path == "/a2a/v1/tasks" or self.path == "/a2a/tasks":
+            if self._require_auth() is None:
+                return
+
         content_length = int(self.headers.get("Content-Length", 0))
         body = self.rfile.read(content_length).decode() if content_length > 0 else "{}"
 
