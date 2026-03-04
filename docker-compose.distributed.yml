@@ -1,0 +1,150 @@
+# PMOVES-BoTZ Distributed Deployment Overlay
+#
+# Use this overlay for deploying BoTZ on separate hardware from other PMOVES submodules.
+# This configuration:
+#   - Creates standalone internal network (no external pmoves_app dependency)
+#   - Binds services to 0.0.0.0 for external access
+#   - Uses environment variables for service discovery
+#   - Optionally includes Tailscale sidecar for VPN mesh
+#
+# Usage:
+#   docker compose -f docker-compose.yml -f docker-compose.distributed.yml up -d
+#
+# With all profiles:
+#   docker compose -f docker-compose.yml -f docker-compose.distributed.yml --profile cipher --profile tools up -d
+#
+# With Tailscale:
+#   docker compose -f docker-compose.yml -f docker-compose.distributed.yml --profile tailscale up -d
+
+services:
+  python-gateway:
+    # Override environment for distributed service discovery
+    environment:
+      PORT: ${GATEWAY_PORT:-2091}
+      HOST: 0.0.0.0
+      # Auth configuration for distributed mode
+      SUPABASE_JWT_SECRET: ${SUPABASE_JWT_SECRET:-}
+      # TensorZero on remote host
+      TENSORZERO_URL: ${TENSORZERO_URL:-http://host.docker.internal:3030}
+      # CORS for distributed clients
+      ALLOWED_ORIGINS: "*"
+    # Expose on all interfaces for external access
+    ports:
+      - "0.0.0.0:${GATEWAY_PORT:-2091}:2091"
+    # Override to use internal network
+    networks:
+      - botz_app
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:2091/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+
+  mcp-bridge:
+    environment:
+      PORT: ${MCP_BRIDGE_PORT:-8100}
+      HOST: 0.0.0.0
+      # Distributed service URLs
+      TENSORZERO_URL: ${TENSORZERO_URL:-http://host.docker.internal:3030}
+      HIRAG_URL: ${HIRAG_URL:-http://host.docker.internal:8086}
+      SUPASERCH_URL: ${SUPASERCH_URL:-http://host.docker.internal:8099}
+      NATS_URL: ${NATS_URL:-nats://host.docker.internal:4222}
+      SUPABASE_URL: ${SUPABASE_URL:-http://host.docker.internal:3010}
+      # DoX integration
+      DOX_BACKEND_URL: ${DOX_BACKEND_URL:-http://host.docker.internal:8484}
+    ports:
+      - "0.0.0.0:${MCP_BRIDGE_PORT:-8100}:8100"
+    networks:
+      - botz_app
+
+  docling-mcp:
+    environment:
+      HOST: 0.0.0.0
+    ports:
+      - "0.0.0.0:${DOCLING_PORT:-3020}:3020"
+    networks:
+      - botz_app
+
+  e2b-runner:
+    environment:
+      HOST: 0.0.0.0
+    ports:
+      - "0.0.0.0:${E2B_PORT:-7071}:7071"
+    networks:
+      - botz_app
+
+  cipher-memory:
+    environment:
+      HOST: 0.0.0.0
+      TENSORZERO_URL: ${TENSORZERO_URL:-http://host.docker.internal:3030}
+    ports:
+      - "0.0.0.0:${CIPHER_PORT:-8081}:8081"
+    networks:
+      - botz_app
+
+  vl-sentinel:
+    environment:
+      HOST: 0.0.0.0
+      OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://host.docker.internal:11434}
+    ports:
+      - "0.0.0.0:${VL_PORT:-7072}:7072"
+    networks:
+      - botz_app
+
+  ollama:
+    ports:
+      - "0.0.0.0:${OLLAMA_PORT:-11434}:11434"
+    networks:
+      - botz_app
+
+  metrics-collector:
+    environment:
+      HOST: 0.0.0.0
+      PROMETHEUS_PUSHGATEWAY: ${PROMETHEUS_PUSHGATEWAY:-http://host.docker.internal:9091}
+    ports:
+      - "0.0.0.0:${METRICS_PORT:-9091}:9091"
+    networks:
+      - botz_app
+
+  # Optional Tailscale sidecar for VPN mesh networking
+  tailscale:
+    image: tailscale/tailscale:latest
+    container_name: pmoves-botz-tailscale
+    hostname: ${TAILSCALE_HOSTNAME:-pmoves-botz}
+    profiles:
+      - tailscale
+    environment:
+      - TS_AUTHKEY=${TAILSCALE_AUTHKEY}
+      - TS_STATE_DIR=/var/lib/tailscale
+      - TS_EXTRA_ARGS=--advertise-routes=${TAILSCALE_ADVERTISE_ROUTES:-172.32.0.0/16}
+      - TS_USERSPACE=false
+    volumes:
+      - tailscale-state:/var/lib/tailscale
+      - /dev/net/tun:/dev/net/tun
+    cap_add:
+      - NET_ADMIN
+      - SYS_MODULE
+    sysctls:
+      - net.ipv4.ip_forward=1
+      - net.ipv6.conf.all.forwarding=1
+    network_mode: host
+    restart: unless-stopped
+
+# Override external network with internal network for distributed mode
+networks:
+  botz_app:
+    driver: bridge
+    name: pmoves_botz_app
+    ipam:
+      config:
+        - subnet: 172.32.1.0/24  # Different from DoX (172.31.x) and parent (172.30.x)
+
+  # Make external network optional (don't fail if it doesn't exist)
+  pmoves_app:
+    external: false
+    driver: bridge
+    name: pmoves_pmoves_app_fallback
+
+volumes:
+  tailscale-state:
