@@ -25,6 +25,17 @@ from urllib.error import URLError
 
 import yaml
 
+# Auth module for JWT validation
+try:
+    import sys
+    sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+    from mcp_bridge.auth import require_auth, check_query_token
+    AUTH_AVAILABLE = True
+except ImportError:
+    AUTH_AVAILABLE = False
+    require_auth = None
+    check_query_token = None
+
 # Prometheus metrics
 try:
     from prometheus_client import Counter, Histogram, generate_latest, CONTENT_TYPE_LATEST
@@ -258,6 +269,49 @@ class GatewayHTTPHandler(BaseHTTPRequestHandler):
     a2a_task_handler: Optional['TaskHandler'] = None
     a2a_enabled: bool = A2A_AVAILABLE
 
+    # Auth configuration
+    auth_enabled: bool = AUTH_AVAILABLE and bool(os.environ.get('SUPABASE_JWT_SECRET', ''))
+
+    # Endpoints that don't require authentication
+    PUBLIC_ENDPOINTS = {
+        '/health', '/healthz', '/metrics',
+        '/.well-known/agent.json',
+        '/a2a/health', '/a2a/v1/health'
+    }
+
+    def _check_auth(self) -> tuple[bool, Optional[Dict[str, Any]], str]:
+        """
+        Check authentication from Authorization header or query token.
+
+        Returns:
+            Tuple of (is_authenticated, payload, message)
+        """
+        if not self.auth_enabled:
+            return True, None, "AUTH_DISABLED"
+
+        # Try Authorization header first
+        auth_header = self.headers.get('Authorization', '')
+        if auth_header:
+            return require_auth(auth_header)
+
+        # Fallback to query parameter token
+        if '?token=' in self.path or '&token=' in self.path:
+            # Parse token from query string
+            query_start = self.path.find('?')
+            if query_start != -1:
+                query_string = self.path[query_start + 1:]
+                for param in query_string.split('&'):
+                    if param.startswith('token='):
+                        token = param[6:]
+                        return check_query_token(token)
+
+        return False, None, "NO_AUTH_PROVIDED"
+
+    def _is_public_endpoint(self) -> bool:
+        """Check if current path is a public endpoint."""
+        path = self.path.split('?')[0]  # Strip query params
+        return path in self.PUBLIC_ENDPOINTS
+
     def _normalize_path(self, path: str) -> str:
         """Normalize path for metrics labels (strip query strings, normalize dynamic segments)."""
         # Strip query strings
@@ -376,17 +430,28 @@ class GatewayHTTPHandler(BaseHTTPRequestHandler):
                     "version": "2.0.0",
                     "upstream_servers": len(self.gateway.upstream_servers),
                     "a2a_enabled": self.a2a_enabled,
+                    "auth_enabled": self.auth_enabled,
                 })
                 if REQUEST_COUNT:
                     REQUEST_COUNT.labels('GET', '/health').inc()
 
             elif self.path == '/servers':
+                # Auth required for server listing
+                is_auth, _, msg = self._check_auth()
+                if not is_auth:
+                    self._send_json(401, {"error": "Unauthorized", "detail": msg})
+                    return
                 servers = self.gateway.list_upstream_servers()
                 self._send_json(200, {"servers": servers})
                 if REQUEST_COUNT:
                     REQUEST_COUNT.labels('GET', '/servers').inc()
 
             elif self.path == '/tools':
+                # Auth required for tool listing
+                is_auth, _, msg = self._check_auth()
+                if not is_auth:
+                    self._send_json(401, {"error": "Unauthorized", "detail": msg})
+                    return
                 tools = self.gateway.get_all_tools()
                 self._send_json(200, {
                     "tools": tools,
@@ -396,6 +461,11 @@ class GatewayHTTPHandler(BaseHTTPRequestHandler):
                     REQUEST_COUNT.labels('GET', '/tools').inc()
 
             elif self.path.startswith('/tools/'):
+                # Auth required for server-specific tool listing
+                is_auth, _, msg = self._check_auth()
+                if not is_auth:
+                    self._send_json(401, {"error": "Unauthorized", "detail": msg})
+                    return
                 server_name = self.path.split('/')[2]
                 tools = self.gateway.get_tools_from_server(server_name)
                 self._send_json(200, {
@@ -439,6 +509,12 @@ class GatewayHTTPHandler(BaseHTTPRequestHandler):
                 return
 
             if self.path == '/call':
+                # Auth required for tool calls
+                is_auth, payload, msg = self._check_auth()
+                if not is_auth:
+                    self._send_json(401, {"error": "Unauthorized", "detail": msg})
+                    return
+
                 # Tool call endpoint
                 tool_name = data.get('tool') or data.get('name')
                 arguments = data.get('arguments', {})
@@ -454,10 +530,21 @@ class GatewayHTTPHandler(BaseHTTPRequestHandler):
                 self._send_json(200, result)
 
             elif self.path == '/mcp':
+                # Auth required for MCP JSON-RPC calls
+                is_auth, payload, msg = self._check_auth()
+                req_id = data.get('id', 1)
+
+                if not is_auth:
+                    self._send_json(401, {
+                        "jsonrpc": "2.0",
+                        "id": req_id,
+                        "error": {"code": -32600, "message": f"Unauthorized: {msg}"}
+                    })
+                    return
+
                 # MCP JSON-RPC endpoint
                 method = data.get('method')
                 params = data.get('params', {})
-                req_id = data.get('id', 1)
 
                 if method == 'tools/list':
                     tools = self.gateway.get_all_tools()
@@ -503,6 +590,18 @@ def main():
 
     logger.info(f"Starting MCP Gateway on {host}:{port}")
     logger.info(f"Configured upstream servers: {list(MCP_UPSTREAM_SERVERS.keys())}")
+
+    # Log JWT auth status
+    jwt_secret = os.environ.get('SUPABASE_JWT_SECRET', '')
+    if AUTH_AVAILABLE and jwt_secret:
+        logger.info("JWT Authentication: Enabled (SUPABASE_JWT_SECRET configured)")
+        logger.info("  - Protected: /call, /mcp, /tools, /servers")
+        logger.info("  - Public: /health, /healthz, /metrics, /.well-known/agent.json")
+    elif AUTH_AVAILABLE and not jwt_secret:
+        logger.warning("JWT Authentication: Disabled (SUPABASE_JWT_SECRET not set)")
+        logger.warning("  - All endpoints accessible without auth (development mode)")
+    else:
+        logger.warning("JWT Authentication: Unavailable (python-jose not installed)")
 
     # Log Prometheus metrics status
     if PROMETHEUS_AVAILABLE:
