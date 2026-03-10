@@ -119,6 +119,11 @@ MCP_UPSTREAM_SERVERS = {
         "url": "http://docling-mcp:3020/sse",
         "description": "Document Processing"
     },
+    "github": {
+        "transport": "stdio",
+        "command": ["python", "features/github/mint_and_exec.py"],
+        "description": "GitHub API via PMOVES.AI App (org-wide)"
+    },
 }
 
 
