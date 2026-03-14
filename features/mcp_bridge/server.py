@@ -38,10 +38,10 @@ class _LatencyTracker:
             self.histogram.observe(time.time() - self.start_time)
 
 try:
-    from .tools import hirag, nats, tensorzero, supabase
+    from .tools import hirag, nats, tensorzero, supabase, cast
 except ImportError:
     # When run directly, use absolute imports
-    from tools import hirag, nats, tensorzero, supabase
+    from tools import hirag, nats, tensorzero, supabase, cast
 
 
 class MCPServer:
@@ -203,6 +203,9 @@ def create_mcp_server() -> MCPServer:
 
     # Register Supabase tools
     server.register_tools_from_module(supabase, supabase.handle_tool)
+
+    # Register Cast tools
+    server.register_tools_from_module(cast, cast.handle_tool)
 
     return server
 
