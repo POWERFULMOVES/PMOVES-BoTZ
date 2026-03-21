@@ -58,3 +58,10 @@ config/codex/local_mcp.json
 
 # Git worktrees (local development)
 .worktrees/
+
+# Windows
+desktop.ini
+Thumbs.db
+
+# Dependencies
+node_modules/

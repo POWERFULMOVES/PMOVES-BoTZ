@@ -272,6 +272,12 @@ class GatewayHTTPHandler(BaseHTTPRequestHandler):
     a2a_task_handler: Optional['TaskHandler'] = None
     a2a_enabled: bool = A2A_AVAILABLE
 
+    # Endpoints that don't require authentication
+    PUBLIC_ENDPOINTS = frozenset({
+        '/health', '/healthz', '/metrics',
+        '/a2a/health', '/a2a/v1/health'
+    })
+
     def _require_auth(self) -> Optional[Dict]:
         """Validate Supabase JWT on protected endpoints.
 
@@ -279,6 +285,11 @@ class GatewayHTTPHandler(BaseHTTPRequestHandler):
         Sends error response and returns None otherwise.
         Fail-closed: if SUPABASE_JWT_SECRET or python-jose is missing, returns 500.
         """
+        # Skip auth for public endpoints
+        path = self.path.split('?')[0]
+        if path in self.PUBLIC_ENDPOINTS:
+            return {"sub": "public", "role": "public"}
+
         if not HAS_JOSE:
             self._send_json(500, {"error": "python-jose not installed — JWT validation unavailable"})
             logger.error("python-jose not installed — rejecting request (fail-closed)")
@@ -489,6 +500,7 @@ class GatewayHTTPHandler(BaseHTTPRequestHandler):
                     "version": "2.0.0",
                     "upstream_servers": len(self.gateway.upstream_servers),
                     "a2a_enabled": self.a2a_enabled,
+                    "auth_enabled": self.auth_enabled,
                 })
                 if REQUEST_COUNT:
                     REQUEST_COUNT.labels('GET', '/health').inc()
@@ -596,9 +608,9 @@ class GatewayHTTPHandler(BaseHTTPRequestHandler):
                 if jwt_payload is None:
                     return
                 agent_id = jwt_payload.get("sub", "unknown")
+                req_id = data.get('id', 1)
                 method = data.get('method')
                 params = data.get('params', {})
-                req_id = data.get('id', 1)
 
                 if method == 'tools/list':
                     tools = self.gateway.get_all_tools()
@@ -655,6 +667,8 @@ def main():
     # Log auth status
     if HAS_JOSE and SUPABASE_JWT_SECRET:
         logger.info("Auth: Supabase JWT validation enabled (unified PMOVES auth)")
+        logger.info("  - Protected: /call, /mcp, /tools, /servers, /a2a/v1/tasks")
+        logger.info("  - Public: /health, /healthz, /metrics, /a2a/health")
     elif not HAS_JOSE:
         logger.warning("Auth: python-jose not installed — all protected endpoints will return 500")
     else:

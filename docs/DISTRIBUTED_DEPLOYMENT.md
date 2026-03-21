@@ -136,14 +136,17 @@ The MCP Gateway validates JWT tokens for protected endpoints:
 **Protected Endpoints:**
 - `POST /call` - Tool execution
 - `POST /mcp` - MCP JSON-RPC
-- `GET /tools/*` - Tool management
-- `GET /servers/*` - Server management
+- `GET /tools` - List all tools
+- `GET /tools/{server}` - List tools from specific server
+- `GET /servers` - List upstream servers
+- `GET /.well-known/agent.json` - A2A agent card
+- `POST /a2a/v1/tasks` - A2A task lifecycle
 
 **Public Endpoints:**
 - `GET /health` - Health check
 - `GET /healthz` - Kubernetes-style health
 - `GET /metrics` - Prometheus metrics
-- `GET /.well-known/agent.json` - A2A manifest
+- `GET /a2a/health` - A2A health check
 
 ### Making Authenticated Requests
 
@@ -294,7 +297,7 @@ OLLAMA_BASE_URL=http://${OLLAMA_HOST}:11434
 
 ### Authentication Errors
 
-```
+```text
 {"error": "Unauthorized", "detail": "NO_AUTH_PROVIDED"}
 ```
 
@@ -305,7 +308,7 @@ OLLAMA_BASE_URL=http://${OLLAMA_HOST}:11434
 
 ### Connection Refused
 
-```
+```text
 Error: connect ECONNREFUSED 192.168.1.10:3030
 ```
 
@@ -316,7 +319,7 @@ Error: connect ECONNREFUSED 192.168.1.10:3030
 
 ### Tool Execution Failed
 
-```
+```text
 {"error": "Tool not found"}
 ```
 
@@ -327,7 +330,7 @@ Error: connect ECONNREFUSED 192.168.1.10:3030
 
 ### Network Isolation Issues
 
-```
+```text
 Error: could not resolve host
 ```
 
@@ -370,6 +373,5 @@ botz.gateway.task.dispatched.v1
 
 ## Related Documentation
 
-- [Parent PMOVES.AI Distributed Guide](../../pmoves/docs/DISTRIBUTED_SUBMODULES.md)
-- [BoTZ CLAUDE.md](./.claude/CLAUDE.md)
+- [BoTZ CLAUDE.md](../.claude/CLAUDE.md)
 - [MCP Bridge Auth](../features/mcp_bridge/auth.py)
