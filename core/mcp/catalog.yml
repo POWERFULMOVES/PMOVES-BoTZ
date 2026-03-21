@@ -86,3 +86,31 @@ mcpServers:
       - hostinger-api-mcp
     env:
       API_TOKEN: ${HOSTINGER_API_KEY}
+
+  # GitHub API (Org-Wide via PMOVES.AI App)
+  # Mints short-lived installation tokens from App credentials,
+  # then launches the upstream @modelcontextprotocol/server-github MCP server.
+  github:
+    command: python
+    args:
+      - features/github/mint_and_exec.py
+    env:
+      GH_APP_ID: ${GH_APP_ID}
+      GH_APP_SEC: ${GH_APP_SEC}
+      GH_APP_INSTALLATION_ID: ${GH_APP_INSTALLATION_ID}
+    description: |
+      GitHub API via PMOVES.AI App — repos, PRs, issues, code search.
+      Org-wide access to all POWERFULMOVES repositories.
+      Tools: create_issue, create_pull_request, search_repositories,
+      get_file_contents, push_files, list_issues, list_pull_requests, etc.
+
+  # VPN & Remote Desktop Management
+  # Headscale VPN (self-hosted Tailscale) + RustDesk remote desktop coordination
+  vpn-manager:
+    url: ${VPN_MANAGER_URL:-http://localhost:8110/sse}
+    transport: sse
+    description: |
+      VPN and remote desktop management tools.
+      Tools: vpn_list_nodes, vpn_create_auth_key, vpn_advertise_route,
+             remote_start_session, remote_end_session, remote_list_sessions.
+      Integrates: Headscale (VPN), RustDesk (remote desktop), Supabase (logging), NATS (events).

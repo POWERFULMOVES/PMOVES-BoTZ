@@ -22,7 +22,7 @@ services:
   mcp-gateway:
     environment:
       - PMOVES_DOCKED_MODE=true
-      - NATS_URL=${NATS_URL:-nats://nats:4222}
+      - NATS_URL=${NATS_URL:-nats://nats:pmoves@nats:4222}
       - TENSORZERO_BASE_URL=${TENSORZERO_BASE_URL:-http://tensorzero-gateway:3030}
     networks:
       - pmoves_api
@@ -40,7 +40,7 @@ services:
       - TENSORZERO_BASE_URL=${TENSORZERO_BASE_URL:-http://tensorzero-gateway:3030}
       - TENSORZERO_API_KEY=${TENSORZERO_API_KEY:-}
       # NATS for memory event publishing
-      - NATS_URL=${NATS_URL:-nats://nats:4222}
+      - NATS_URL=${NATS_URL:-nats://nats:pmoves@nats:4222}
       - NATS_SUBJECT_PREFIX=botz.cipher
     networks:
       pmoves_data:
@@ -55,7 +55,7 @@ services:
       - PMOVES_DOCKED_MODE=true
       - N8N_API_URL=${N8N_API_URL:-http://n8n:5678/api/v1}
       - TENSORZERO_BASE_URL=${TENSORZERO_BASE_URL:-http://tensorzero-gateway:3030}
-      - NATS_URL=${NATS_URL:-nats://nats:4222}
+      - NATS_URL=${NATS_URL:-nats://nats:pmoves@nats:4222}
     networks:
       - pmoves_api
       - pmoves_app
@@ -68,7 +68,7 @@ services:
   docling-mcp:
     environment:
       - PMOVES_DOCKED_MODE=true
-      - NATS_URL=${NATS_URL:-nats://nats:4222}
+      - NATS_URL=${NATS_URL:-nats://nats:pmoves@nats:4222}
       - NATS_SUBJECT_PREFIX=botz.docling
     networks:
       - pmoves_app
@@ -80,7 +80,7 @@ services:
   e2b-runner:
     environment:
       - PMOVES_DOCKED_MODE=true
-      - NATS_URL=${NATS_URL:-nats://nats:4222}  # For execution telemetry
+      - NATS_URL=${NATS_URL:-nats://nats:pmoves@nats:4222}  # For execution telemetry
     networks:
       - pmoves_api
       - pmoves_bus
@@ -128,7 +128,7 @@ services:
   postman:
     environment:
       - PMOVES_DOCKED_MODE=true
-      - NATS_URL=${NATS_URL:-nats://nats:4222}
+      - NATS_URL=${NATS_URL:-nats://nats:pmoves@nats:4222}
     networks:
       - pmoves_api
       - pmoves_app

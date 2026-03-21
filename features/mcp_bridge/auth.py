@@ -19,6 +19,8 @@ Usage:
 import os
 from typing import Tuple, Dict, Any, Optional
 
+from fastapi import HTTPException
+
 try:
     from jose import jwt
     HAS_JOSE = True
@@ -53,12 +55,16 @@ def validate_jwt_token(token: str) -> Tuple[bool, Optional[Dict[str, Any]], str]
         return False, None, "MISSING_TOKEN"
 
     if not HAS_JOSE:
-        # If python-jose is not installed, skip validation
-        return True, None, "VALIDATION_UNAVAILABLE"
+        raise HTTPException(
+            status_code=500,
+            detail="python-jose not installed — JWT validation unavailable"
+        )
 
     if not JWT_SECRET:
-        # If no JWT secret is configured, allow all (development mode)
-        return True, None, "NO_SECRET_CONFIGURED"
+        raise HTTPException(
+            status_code=500,
+            detail="JWT_SECRET not configured — authentication unavailable"
+        )
 
     try:
         # Decode and verify signature

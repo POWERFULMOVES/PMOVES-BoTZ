@@ -1,0 +1,35 @@
+# PMOVES VPN MCP Configuration
+# Configuration for VPN and Remote Desktop management
+
+# Headscale configuration
+headscale:
+  url: ${HEADSCALE_URL:-http://headscale:8096}
+  api_key: ${HEADSCALE_API_KEY}
+  timeout: 30
+
+# RustDesk configuration
+rustdesk:
+  hbbs_url: ${RUSTDESK_HBBS_URL:-http://rustdesk-hbbs:21118}
+  hbbr_url: ${RUSTDESK_HBBR_URL:-http://rustdesk-hbbr:21117}
+
+# Supabase configuration
+supabase:
+  url: ${SUPABASE_URL}
+  service_key: ${SUPABASE_SERVICE_KEY}
+
+# NATS configuration
+nats:
+  url: ${NATS_URL:-nats://nats:pmoves@nats:4222}
+  user: ${NATS_USER:-pmoves}
+  pass: ${NATS_PASS:-pmoves}
+
+# MCP server configuration
+server:
+  transport: ${MCP_TRANSPORT:-stdio}
+  port: ${MCP_PORT:-8110}
+  log_level: ${LOG_LEVEL:-INFO}
+
+# Session defaults
+sessions:
+  default_connection_type: rustdesk
+  max_duration_seconds: 86400  # 24 hours

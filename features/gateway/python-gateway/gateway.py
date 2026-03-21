@@ -11,6 +11,9 @@ Also provides A2A (Agent-to-Agent) protocol endpoints:
 """
 
 import asyncio
+import base64
+import hashlib
+import hmac
 import json
 import logging
 import os
@@ -24,6 +27,17 @@ from urllib.request import urlopen, Request
 from urllib.error import URLError
 
 import yaml
+
+# JWT authentication (unified with PMOVES.AI Supabase auth)
+try:
+    from jose import jwt as jose_jwt
+    HAS_JOSE = True
+except ImportError:
+    HAS_JOSE = False
+    jose_jwt = None
+
+SUPABASE_JWT_SECRET = os.environ.get("SUPABASE_JWT_SECRET", "")
+JWT_ALGORITHM = "HS256"
 
 # Prometheus metrics
 try:
@@ -104,6 +118,11 @@ MCP_UPSTREAM_SERVERS = {
         "transport": "sse",
         "url": "http://docling-mcp:3020/sse",
         "description": "Document Processing"
+    },
+    "github": {
+        "transport": "stdio",
+        "command": ["python", "features/github/mint_and_exec.py"],
+        "description": "GitHub API via PMOVES.AI App (org-wide)"
     },
 }
 
@@ -258,6 +277,99 @@ class GatewayHTTPHandler(BaseHTTPRequestHandler):
     a2a_task_handler: Optional['TaskHandler'] = None
     a2a_enabled: bool = A2A_AVAILABLE
 
+    def _require_auth(self) -> Optional[Dict]:
+        """Validate Supabase JWT on protected endpoints.
+
+        Returns decoded JWT payload if auth passes.
+        Sends error response and returns None otherwise.
+        Fail-closed: if SUPABASE_JWT_SECRET or python-jose is missing, returns 500.
+        """
+        if not HAS_JOSE:
+            self._send_json(500, {"error": "python-jose not installed — JWT validation unavailable"})
+            logger.error("python-jose not installed — rejecting request (fail-closed)")
+            return None
+
+        if not SUPABASE_JWT_SECRET:
+            self._send_json(500, {"error": "SUPABASE_JWT_SECRET not configured — authentication unavailable"})
+            logger.error("SUPABASE_JWT_SECRET not set — rejecting request (fail-closed)")
+            return None
+
+        auth_header = self.headers.get("Authorization", "")
+        if not auth_header:
+            self._send_json(401, {"error": "Missing Authorization header"})
+            return None
+
+        # Extract Bearer token
+        if auth_header.startswith("Bearer "):
+            token = auth_header[7:]
+        else:
+            token = auth_header
+
+        if not token:
+            self._send_json(401, {"error": "Empty token"})
+            return None
+
+        try:
+            payload = jose_jwt.decode(
+                token,
+                SUPABASE_JWT_SECRET,
+                algorithms=[JWT_ALGORITHM],
+                options={
+                    "verify_signature": True,
+                    "verify_aud": False,
+                    "verify_exp": True,
+                },
+            )
+        except jose_jwt.ExpiredSignatureError:
+            self._send_json(401, {"error": "Token expired"})
+            return None
+        except jose_jwt.InvalidSignatureError:
+            self._send_json(403, {"error": "Invalid token signature"})
+            return None
+        except jose_jwt.JWTError as e:
+            self._send_json(403, {"error": f"JWT validation failed: {e}"})
+            return None
+
+        # Reject anon keys (same as mcp_bridge/auth.py)
+        role = payload.get("role", "")
+        if role == "anon":
+            self._send_json(403, {"error": "Anonymous keys are not permitted"})
+            return None
+
+        return payload
+
+    def _sign_chit_attestation(self, endpoint: str, agent_id: str) -> str:
+        """Create a CHIT CGP attestation proving request transited through this gateway.
+
+        The proof field is an HMAC-like hash using the JWT secret — only services
+        holding SUPABASE_JWT_SECRET can generate or verify valid proofs.
+        """
+        ts = int(time.time())
+        attestation = {
+            "version": "chit.cgp.v1.0",
+            "namespace": "pmoves.safe-passage",
+            "service": "botz-mcp-gateway",
+            "endpoint": endpoint,
+            "agent_id": agent_id,
+            "timestamp": ts,
+            "proof": hmac.new(
+                SUPABASE_JWT_SECRET.encode(),
+                f"{endpoint}:{agent_id}:{ts}".encode(),
+                hashlib.sha256
+            ).hexdigest()[:16],
+        }
+        return base64.b64encode(json.dumps(attestation).encode()).decode()
+
+    def _send_json_with_attestation(self, status: int, data: Dict, endpoint: str, agent_id: str):
+        """Send JSON response with X-CHIT-Attestation header on authenticated responses."""
+        self.send_response(status)
+        self.send_header('Content-Type', 'application/json')
+        self.send_header('Access-Control-Allow-Origin', '*')
+        attestation = self._sign_chit_attestation(endpoint, agent_id)
+        self.send_header('X-CHIT-Attestation', attestation)
+        self.end_headers()
+        self.wfile.write(json.dumps(data, indent=2).encode())
+
     def _normalize_path(self, path: str) -> str:
         """Normalize path for metrics labels (strip query strings, normalize dynamic segments)."""
         # Strip query strings
@@ -303,7 +415,7 @@ class GatewayHTTPHandler(BaseHTTPRequestHandler):
         self.send_response(200)
         self.send_header('Access-Control-Allow-Origin', '*')
         self.send_header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
-        self.send_header('Access-Control-Allow-Headers', 'Content-Type')
+        self.send_header('Access-Control-Allow-Headers', 'Content-Type, Authorization')
         self.end_headers()
 
     def do_GET(self):
@@ -330,8 +442,11 @@ class GatewayHTTPHandler(BaseHTTPRequestHandler):
                     REQUEST_COUNT.labels('GET', '/metrics').inc()
                 return
 
-            # A2A Agent Card discovery endpoint
+            # A2A Agent Card discovery endpoint — auth-gated to prevent topology leak
             if self.path == '/.well-known/agent.json':
+                jwt_payload = self._require_auth()
+                if jwt_payload is None:
+                    return
                 if self.a2a_enabled:
                     tools = self.gateway.get_all_tools()
                     card = get_agent_card(self.gateway.upstream_servers, tools)
@@ -354,8 +469,11 @@ class GatewayHTTPHandler(BaseHTTPRequestHandler):
                     REQUEST_COUNT.labels('GET', self.path).inc()
                 return
 
-            # A2A task info (GET)
+            # A2A task info (GET) — protected
             if self.path.startswith('/a2a/v1/tasks/') and self.a2a_task_handler:
+                jwt_payload = self._require_auth()
+                if jwt_payload is None:
+                    return
                 task_id = self.path.split('/')[4]
                 result = self.a2a_task_handler.handle_jsonrpc({
                     "jsonrpc": "2.0",
@@ -381,12 +499,18 @@ class GatewayHTTPHandler(BaseHTTPRequestHandler):
                     REQUEST_COUNT.labels('GET', '/health').inc()
 
             elif self.path == '/servers':
+                jwt_payload = self._require_auth()
+                if jwt_payload is None:
+                    return
                 servers = self.gateway.list_upstream_servers()
                 self._send_json(200, {"servers": servers})
                 if REQUEST_COUNT:
                     REQUEST_COUNT.labels('GET', '/servers').inc()
 
             elif self.path == '/tools':
+                jwt_payload = self._require_auth()
+                if jwt_payload is None:
+                    return
                 tools = self.gateway.get_all_tools()
                 self._send_json(200, {
                     "tools": tools,
@@ -396,6 +520,9 @@ class GatewayHTTPHandler(BaseHTTPRequestHandler):
                     REQUEST_COUNT.labels('GET', '/tools').inc()
 
             elif self.path.startswith('/tools/'):
+                jwt_payload = self._require_auth()
+                if jwt_payload is None:
+                    return
                 server_name = self.path.split('/')[2]
                 tools = self.gateway.get_tools_from_server(server_name)
                 self._send_json(200, {
@@ -428,18 +555,26 @@ class GatewayHTTPHandler(BaseHTTPRequestHandler):
                 self._send_json(400, {"error": "Invalid JSON"})
                 return
 
-            # A2A JSON-RPC endpoint
+            # A2A JSON-RPC endpoint (protected)
             if self.path == '/a2a/v1/tasks' or self.path == '/a2a/tasks':
+                jwt_payload = self._require_auth()
+                if jwt_payload is None:
+                    return
+                agent_id = jwt_payload.get("sub", "unknown")
                 if self.a2a_task_handler:
                     result = self.a2a_task_handler.handle_jsonrpc(data)
                     status = 200 if "result" in result else 400
-                    self._send_json(status, result)
+                    self._send_json_with_attestation(status, result, "/a2a/v1/tasks", agent_id)
                 else:
                     self._send_json(501, {"error": "A2A protocol not available"})
                 return
 
             if self.path == '/call':
-                # Tool call endpoint
+                # Tool call endpoint (protected)
+                jwt_payload = self._require_auth()
+                if jwt_payload is None:
+                    return
+                agent_id = jwt_payload.get("sub", "unknown")
                 tool_name = data.get('tool') or data.get('name')
                 arguments = data.get('arguments', {})
 
@@ -451,21 +586,32 @@ class GatewayHTTPHandler(BaseHTTPRequestHandler):
                 self._track_tool_call(tool_name)
 
                 result = self.gateway.call_tool(tool_name, arguments)
-                self._send_json(200, result)
+                self._send_json_with_attestation(200, result, f"/call:{tool_name}", agent_id)
+
+                # Fire-and-forget graphiti trail event
+                try:
+                    from graphiti import emit_tool_call_trail
+                    emit_tool_call_trail(tool_name, agent_id, "error" not in result)
+                except Exception:
+                    pass  # Best-effort, never block the response
 
             elif self.path == '/mcp':
-                # MCP JSON-RPC endpoint
+                # MCP JSON-RPC endpoint (protected)
+                jwt_payload = self._require_auth()
+                if jwt_payload is None:
+                    return
+                agent_id = jwt_payload.get("sub", "unknown")
                 method = data.get('method')
                 params = data.get('params', {})
                 req_id = data.get('id', 1)
 
                 if method == 'tools/list':
                     tools = self.gateway.get_all_tools()
-                    self._send_json(200, {
+                    self._send_json_with_attestation(200, {
                         "jsonrpc": "2.0",
                         "id": req_id,
                         "result": {"tools": tools}
-                    })
+                    }, f"/mcp:{method}", agent_id)
 
                 elif method == 'tools/call':
                     tool_name = params.get('name')
@@ -475,11 +621,18 @@ class GatewayHTTPHandler(BaseHTTPRequestHandler):
                     self._track_tool_call(tool_name)
 
                     result = self.gateway.call_tool(tool_name, arguments)
-                    self._send_json(200, {
+                    self._send_json_with_attestation(200, {
                         "jsonrpc": "2.0",
                         "id": req_id,
                         "result": result.get('result', result)
-                    })
+                    }, f"/mcp:tools/call:{tool_name}", agent_id)
+
+                    # Fire-and-forget graphiti trail event
+                    try:
+                        from graphiti import emit_tool_call_trail
+                        emit_tool_call_trail(tool_name, agent_id, "error" not in result)
+                    except Exception:
+                        pass
 
                 else:
                     self._send_json(400, {
@@ -503,6 +656,14 @@ def main():
 
     logger.info(f"Starting MCP Gateway on {host}:{port}")
     logger.info(f"Configured upstream servers: {list(MCP_UPSTREAM_SERVERS.keys())}")
+
+    # Log auth status
+    if HAS_JOSE and SUPABASE_JWT_SECRET:
+        logger.info("Auth: Supabase JWT validation enabled (unified PMOVES auth)")
+    elif not HAS_JOSE:
+        logger.warning("Auth: python-jose not installed — all protected endpoints will return 500")
+    else:
+        logger.warning("Auth: SUPABASE_JWT_SECRET not set — all protected endpoints will return 500")
 
     # Log Prometheus metrics status
     if PROMETHEUS_AVAILABLE:

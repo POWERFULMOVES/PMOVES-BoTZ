@@ -42,7 +42,7 @@ services:
       - HOST=0.0.0.0
       - TENSORZERO_URL=${TENSORZERO_URL:-http://tensorzero:3030}
       - HIRAG_URL=${HIRAG_URL:-http://hi-rag-gateway-v2:8086}
-      - NATS_URL=${NATS_URL:-nats://nats:4222}
+      - NATS_URL=${NATS_URL:-nats://nats:pmoves@nats:4222}
       - SUPABASE_URL=${SUPABASE_URL:-http://supabase:3010}
       - SUPABASE_ANON_KEY=${SUPABASE_ANON_KEY:-}
     healthcheck:

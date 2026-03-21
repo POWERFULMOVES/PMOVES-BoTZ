@@ -14,7 +14,7 @@ class Config:
     # Service URLs
     tensorzero_url: str = "http://localhost:3030"
     hirag_url: str = "http://localhost:8086"
-    nats_url: str = "nats://localhost:4222"
+    nats_url: str = "nats://nats:pmoves@localhost:4222"
     supabase_url: str = "http://localhost:3010"
     gateway_url: str = "http://localhost:2091"
 

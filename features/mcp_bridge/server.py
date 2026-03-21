@@ -1,28 +1,3 @@
-"""
-PMOVES MCP Bridge Server
-
-Combined MCP server exposing all PMOVES services as tools.
-Can be run standalone or integrated with Claude Agent SDK.
-
-Tools Exposed:
-- Hi-RAG: hirag_query, hirag_similarity, hirag_graph, hirag_health
-- NATS: nats_publish, nats_request, nats_subjects, nats_health
-- TensorZero: tensorzero_chat, tensorzero_embed, tensorzero_providers, tensorzero_health
-- Supabase: supabase_query, supabase_insert, supabase_rpc, supabase_tables, supabase_health
-
-Usage:
-    # Run as standalone server
-    python -m pmoves_botz.features.mcp_bridge.server
-
-    # Or programmatically
-    from pmoves_botz.features.mcp_bridge.server import create_mcp_server, run_server
-    server = create_mcp_server()
-    await run_server(server)
-
-Protocol:
-    Uses JSON-RPC over stdio for MCP communication.
-"""
-
 import asyncio
 import json
 import sys
@@ -63,10 +38,10 @@ class _LatencyTracker:
             self.histogram.observe(time.time() - self.start_time)
 
 try:
-    from .tools import hirag, nats, tensorzero, supabase
+    from .tools import hirag, nats, tensorzero, supabase, cast
 except ImportError:
     # When run directly, use absolute imports
-    from tools import hirag, nats, tensorzero, supabase
+    from tools import hirag, nats, tensorzero, supabase, cast
 
 
 class MCPServer:
@@ -228,6 +203,9 @@ def create_mcp_server() -> MCPServer:
 
     # Register Supabase tools
     server.register_tools_from_module(supabase, supabase.handle_tool)
+
+    # Register Cast tools
+    server.register_tools_from_module(cast, cast.handle_tool)
 
     return server
 
