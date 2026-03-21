@@ -63,16 +63,22 @@ def mint_installation_token() -> str:
 def main() -> None:
     """Mint token and exec the upstream MCP server."""
     token = mint_installation_token()
-    os.environ["GITHUB_PERSONAL_ACCESS_TOKEN"] = token
+
+    # Build clean env: inject minted token, strip App secrets
+    child_env = {k: v for k, v in os.environ.items()
+                 if k not in ("GH_APP_SEC", "GH_APP_ID", "GH_APP_INSTALL_ID")}
+    child_env["GITHUB_PERSONAL_ACCESS_TOKEN"] = token
 
     if sys.platform == "win32":
         # Windows lacks execvp; use subprocess as fallback
         result = subprocess.run(
             ["npx", "-y", "@modelcontextprotocol/server-github"],
-            env=os.environ,
+            env=child_env,
         )
         sys.exit(result.returncode)
     else:
+        os.environ.clear()
+        os.environ.update(child_env)
         os.execvp("npx", ["npx", "-y", "@modelcontextprotocol/server-github"])
 
 

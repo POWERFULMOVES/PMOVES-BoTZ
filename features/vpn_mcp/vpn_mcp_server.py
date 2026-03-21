@@ -117,9 +117,7 @@ class VPNMCPServer:
 
         if self.ncs is None:
             try:
-                self.ncs = await nats.connect(
-                    NATS_URL.replace("nats://", f"nats://{NATS_USER}:{NATS_PASS}@")
-                )
+                self.ncs = await nats.connect(NATS_URL)
                 logger.info(f"Connected to NATS at {NATS_URL}")
             except Exception as e:
                 logger.warning(f"Failed to connect to NATS: {e}")

@@ -187,7 +187,7 @@ async def _discover_devices(force: bool = False) -> list[dict]:
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
         )
-        stdout, stderr = await proc.communicate()
+        stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=30)
 
         if proc.returncode != 0:
             return []
@@ -403,7 +403,7 @@ async def _cast_audio_file(
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
         )
-        stdout, stderr = await proc.communicate()
+        stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=30)
 
         # Cleanup temp file if needed
         if cleanup and os.path.exists(audio_path):
@@ -455,7 +455,7 @@ async def _handle_status(args: dict) -> dict:
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
         )
-        stdout, stderr = await proc.communicate()
+        stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=30)
 
         if proc.returncode == 0:
             status_output = stdout.decode().strip()
@@ -502,7 +502,7 @@ async def _handle_stop(args: dict) -> dict:
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
         )
-        stdout, stderr = await proc.communicate()
+        stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=30)
 
         if proc.returncode == 0:
             device_name = device or "default device"
