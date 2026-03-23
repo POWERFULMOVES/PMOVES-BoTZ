@@ -124,6 +124,11 @@ MCP_UPSTREAM_SERVERS = {
         "command": ["python", "features/github/mint_and_exec.py"],
         "description": "GitHub API via PMOVES.AI App (org-wide)"
     },
+    "discord": {
+        "transport": "http",
+        "url": os.environ.get("DISCORD_MCP_URL", "http://publisher-discord:8092/mcp"),
+        "description": "Discord Channel Reader (read messages, search history)"
+    },
 }
 
 
