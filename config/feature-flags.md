@@ -11,6 +11,39 @@ Features are activated by setting environment variables in your `.env` file. Eac
 - **MCP Gateway**: Aggregates MCP tools for ChatGPT Desktop
 - **Docling MCP**: Document parsing and extraction
 
+### BoTZ Framework - MiniMax Tactical Partner
+**Phase 3 Integration: MiniMax as BoTZ Tactical Partner**
+
+Set `PMOVES_FEATURE_BOTZ_MINIMAX=true` to enable:
+- **MiniMax M2.7**: 1M token context, BoTZ tactical partner (primary)
+- **MiniMax M2.1**: 100K token context, efficient overflow model
+- **TensorZero Routing**: BoTZ-guided model selection
+- **Hyperdimensional Ops**: Wave-function collapse, agent-trails visualization
+
+Environment variables required:
+```bash
+# MiniMax API (required for BoTZ tactical partner)
+MINIMAX_API_KEY=your_api_key_here
+
+# BoTZ Framework Settings
+BOTZ_ENABLED=true
+BOTZ_MINIMAX_AFFINITY=high  # high, medium, low
+BOTZ_RESONANCE_DOMAINS=hyperdimensional-ops,wave-function-collapse,long-context
+
+# TensorZero Integration
+TENSORZERO_CONFIG=/path/to/tensorzero.minimax.toml
+```
+
+#### BoTZ Routing Rules
+
+| Task Type | Primary Model | Fallback | Resonance |
+|-----------|---------------|----------|-----------|
+| Long-context research | minimax-m2.7 | qwen3.5-27b | hyperdimensional-ops |
+| Coding overflow | minimax-m2.1 | glm-4 | coding-primary |
+| Architecture visualization | minimax-m2.7 | — | long-context |
+| Hyperdimensional ops | minimax-m2.7 | — | wave-function-collapse |
+| Writing tasks | minimax-m2.7 | minimax-m2.1 | multimodal |
+
 ### Optional Features
 
 #### PRO Features
