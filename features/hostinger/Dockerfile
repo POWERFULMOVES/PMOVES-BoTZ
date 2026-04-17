@@ -7,14 +7,13 @@ WORKDIR /app
 # Install hostinger-api-mcp globally
 RUN npm install -g hostinger-api-mcp@latest
 
-# Copy entrypoint
+# Copy entrypoint and fix line endings (Windows CRLF → Unix LF)
 COPY entrypoint.sh /app/entrypoint.sh
-RUN chmod +x /app/entrypoint.sh
+RUN sed -i 's/\r$//' /app/entrypoint.sh && chmod +x /app/entrypoint.sh
 
-# Create non-root user
-RUN useradd -m -u 1000 -s /bin/bash appuser && \
-    chown -R appuser:appuser /app
-USER appuser
+# Use existing node user (UID 1000) from node:20-slim
+RUN chown -R node:node /app
+USER node
 
 # Environment variables
 ENV API_TOKEN=""
