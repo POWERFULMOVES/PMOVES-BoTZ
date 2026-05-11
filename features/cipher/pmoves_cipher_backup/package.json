@@ -129,7 +129,7 @@
 		"puppeteer": "^24.20.0",
 		"tiktoken": "^1.0.21",
 		"undici": "^7.11.0",
-		"uuid": "^11.1.0",
+		"uuid": "^14.0.0",
 		"weaviate-ts-client": "^2.2.0",
 		"winston": "^3.17.0",
 		"ws": "^8.18.0",
