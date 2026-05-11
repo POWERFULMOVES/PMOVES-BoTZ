@@ -1,5 +1,5 @@
 # HTTP server and JSON handling
-requests==2.33.0
+requests==2.34.0
 pyyaml==6.0.1
 
 # FastAPI (optional, for future use)
