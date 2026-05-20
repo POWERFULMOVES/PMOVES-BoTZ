@@ -29,7 +29,7 @@ except ImportError:
     jwt = None
 
 # Supabase JWT secret (shared with PMOVES.AI)
-JWT_SECRET = os.getenv("SUPABASE_JWT_SECRET", "")
+JWT_SECRET = os.getenv("JWT_SECRET", "")
 JWT_ALGORITHM = "HS256"
 
 

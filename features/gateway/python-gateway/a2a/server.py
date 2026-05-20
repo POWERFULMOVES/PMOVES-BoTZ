@@ -34,7 +34,7 @@ from .types import TaskState
 logger = logging.getLogger(__name__)
 
 JWT_ALGORITHM = os.environ.get("JWT_ALGORITHM", "HS256")
-SUPABASE_JWT_SECRET = os.environ.get("SUPABASE_JWT_SECRET", "").strip()
+JWT_SECRET = os.environ.get("JWT_SECRET", "").strip()
 
 try:
     from jose import jwt as jose_jwt
@@ -61,9 +61,9 @@ class A2AHTTPHandler(BaseHTTPRequestHandler):
             logger.error("python-jose not installed - rejecting request (fail-closed)")
             return None
 
-        if not SUPABASE_JWT_SECRET:
-            self._send_json(500, {"error": "SUPABASE_JWT_SECRET not configured - authentication unavailable"})
-            logger.error("SUPABASE_JWT_SECRET not set - rejecting request (fail-closed)")
+        if not JWT_SECRET:
+            self._send_json(500, {"error": "JWT_SECRET not configured - authentication unavailable"})
+            logger.error("JWT_SECRET not set - rejecting request (fail-closed)")
             return None
 
         auth_header = self.headers.get("Authorization", "")
@@ -80,7 +80,7 @@ class A2AHTTPHandler(BaseHTTPRequestHandler):
         try:
             payload = jose_jwt.decode(
                 token,
-                SUPABASE_JWT_SECRET,
+                JWT_SECRET,
                 algorithms=[JWT_ALGORITHM],
                 options={"verify_signature": True, "verify_aud": False, "verify_exp": True},
             )
