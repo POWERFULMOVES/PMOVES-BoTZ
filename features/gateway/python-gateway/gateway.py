@@ -276,6 +276,7 @@ class GatewayHTTPHandler(BaseHTTPRequestHandler):
     # A2A components (initialized in main)
     a2a_task_handler: Optional['TaskHandler'] = None
     a2a_enabled: bool = A2A_AVAILABLE
+    auth_enabled: bool = bool(HAS_JOSE and SUPABASE_JWT_SECRET)
 
     def _require_auth(self) -> Optional[Dict]:
         """Validate Supabase JWT on protected endpoints.
