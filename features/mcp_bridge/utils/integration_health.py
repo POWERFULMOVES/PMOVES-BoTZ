@@ -85,9 +85,13 @@ class IntegrationHealth:
             return False
 
         try:
+            # `connect_timeout` is the nats-py spelling (2.x, verified against
+            # the signature in the image: nats-py 2.15.0). The earlier
+            # `timeout=` kwarg raised TypeError on EVERY probe, so the NATS
+            # check reported unhealthy while the broker was reachable.
             nc = await nats.connect(
                 self.nats_url,
-                timeout=timeout
+                connect_timeout=timeout
             )
             await nc.flush()
             await nc.close()
