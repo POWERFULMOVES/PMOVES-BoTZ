@@ -298,9 +298,18 @@ async def run_http_server(server: MCPServer, host: str = "0.0.0.0", port: int = 
 
     async def handle_health(request: web.Request) -> web.Response:
         """Health check endpoint."""
-        # Import here to avoid import errors if module not available
+        # Import here to avoid import errors if module not available.
+        # Dual-form for the same reason as the tools import at module top:
+        # launched as `python -m server`, this file has no package parent,
+        # so the relative form raises "attempted relative import with no
+        # known parent package" -- which degraded EVERY healthcheck since
+        # the standalone image shipped while the server itself booted on
+        # the absolute fallback. Health must not be the one path without it.
         try:
             from .utils.integration_health import IntegrationHealth
+        except ImportError:
+            from utils.integration_health import IntegrationHealth
+        try:
             health_check = IntegrationHealth()
             integrations = await health_check.get_status()
 
@@ -353,7 +362,12 @@ async def run_http_server(server: MCPServer, host: str = "0.0.0.0", port: int = 
 
     # Check integration health at startup
     try:
-        from .utils.integration_health import IntegrationHealth
+        # Dual-form, matching the /healthz handler: `python -m server` has
+        # no package parent, so the relative form cannot work here either.
+        try:
+            from .utils.integration_health import IntegrationHealth
+        except ImportError:
+            from utils.integration_health import IntegrationHealth
         health_check = IntegrationHealth()
         integrations = await health_check.get_status()
 
