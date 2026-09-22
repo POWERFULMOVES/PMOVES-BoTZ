@@ -85,7 +85,14 @@ services:
     networks:
       - pmoves_app
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8100/healthz', timeout=5)"]
+      # Reads the RESPONSE BODY, not just the status line. /healthz answers 200
+      # with {"status": "degraded", ...} when an integration probe fails, so a
+      # bare urlopen() -- which only checks that the request did not raise --
+      # reported this container healthy for 5 days while it was self-reporting
+      # degraded ("Integration health check failed: attempted relative import
+      # with no known parent package"). A health check that cannot observe the
+      # health field is not a health check.
+      test: ["CMD", "python", "-c", "import json,sys,urllib.request; d=json.load(urllib.request.urlopen('http://localhost:8100/healthz', timeout=5)); sys.exit(0 if d.get('status') in ('ok','healthy') else 1)"]
       interval: 30s
       timeout: 5s
       retries: 3
