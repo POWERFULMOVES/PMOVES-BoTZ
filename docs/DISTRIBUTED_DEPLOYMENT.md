@@ -374,4 +374,6 @@ botz.gateway.task.dispatched.v1
 ## Related Documentation
 
 - [BoTZ CLAUDE.md](../.claude/CLAUDE.md)
+- [Parent PMOVES.AI Distributed Guide](../../pmoves/docs/DISTRIBUTED_SUBMODULES.md)
+- [BoTZ CLAUDE.md](./.claude/CLAUDE.md)
 - [MCP Bridge Auth](../features/mcp_bridge/auth.py)

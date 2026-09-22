@@ -257,7 +257,7 @@ runs-on: self-hosted
 - Store credentials only in GitHub Secrets (org/repo/env scope) and the team vault; never in tracked files.
 - **Personal Access Tokens (PATs):** For CLI authentication, use Personal Access Tokens instead of passwords. PATs provide better security (2FA compatibility, specific scopes) and can be easily revoked. Generate them in [Docker Hub Account Settings](https://app.docker.com/).
 - **Service Accounts (Bots):** For CI/CD pipelines (e.g., GitHub Actions), do *not* use a personal user's PAT. Create a dedicated "Bot" Docker Hub account, generate a PAT for it, and use that credential. This decouples automation from individual team members.
-- Standard secret names: `GH_PAT_PUBLISH`, `GHCR_USERNAME`, `DOCKERHUB_PAT`, `DOCKERHUB_USERNAME`, `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_JWT_SECRET`, `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `YOUTUBE_API_KEY`, `GOOGLE_OAUTH_CLIENT_SECRET`, `DISCORD_WEBHOOK` (add more as needed; keep them documented in `docs/SECRETS_ONBOARDING.md`).
+- Standard secret names: `GH_PAT_PUBLISH`, `GHCR_USERNAME`, `DOCKERHUB_PAT`, `DOCKERHUB_USERNAME`, `SUPABASE_SERVICE_ROLE_KEY`, `JWT_SECRET`, `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `YOUTUBE_API_KEY`, `GOOGLE_OAUTH_CLIENT_SECRET`, `DISCORD_WEBHOOK` (add more as needed; keep them documented in `docs/SECRETS_ONBOARDING.md`).
 - Image publishing: workflows should `docker/login-action` to GHCR and Docker Hub using the secrets above, then `docker/build-push-action` with SBOM+provenance and signed tags.
 
 ---

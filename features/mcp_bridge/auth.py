@@ -29,7 +29,9 @@ except ImportError:
     jwt = None
 
 # Supabase JWT secret (shared with PMOVES.AI)
-JWT_SECRET = os.getenv("SUPABASE_JWT_SECRET", "")
+# Fleet convention: SUPABASE_JWT_SECRET is primary, JWT_SECRET is the fallback.
+JWT_SECRET = (os.getenv("SUPABASE_JWT_SECRET", "").strip()
+              or os.getenv("JWT_SECRET", ""))
 JWT_ALGORITHM = "HS256"
 
 

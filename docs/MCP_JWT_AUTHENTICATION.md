@@ -22,21 +22,21 @@ PMOVES-BoTZ MCP servers support JWT authentication using the Supabase JWT secret
                                                      │
                                                      ▼
                                         ┌─────────────────────────┐
-                                        │   SUPABASE_JWT_SECRET   │
+                                        │   JWT_SECRET   │
                                         │   (Environment Var)    │
                                         └─────────────────────────┘
 ```
 
 ## Configuration
 
-Set the `SUPABASE_JWT_SECRET` environment variable:
+Set the `JWT_SECRET` environment variable:
 
 ```bash
 # In .env file
-SUPABASE_JWT_SECRET=your-jwt-secret-here
+JWT_SECRET=your-jwt-secret-here
 
 # Or export directly
-export SUPABASE_JWT_SECRET=your-jwt-secret-here
+export JWT_SECRET=your-jwt-secret-here
 ```
 
 ## Usage
@@ -131,7 +131,7 @@ The JWT validation accepts the following roles:
 
 2. **Token Expiry**: JWT tokens should have reasonable expiry times (e.g., 1 hour for service tokens).
 
-3. **Secret Rotation**: Regularly rotate `SUPABASE_JWT_SECRET` in production.
+3. **Secret Rotation**: Regularly rotate `JWT_SECRET` in production.
 
 4. **Development Mode**: If no JWT secret is configured, authentication is skipped (for local development).
 
@@ -203,7 +203,7 @@ curl -H "Authorization: Bearer <token>" http://localhost:3020/sse
 - Token has exceeded its expiry time
 
 **Error: "INVALID_SIGNATURE"**
-- Token signed with wrong secret (check SUPABASE_JWT_SECRET)
+- Token signed with wrong secret (check JWT_SECRET)
 
 **Error: "ANON_KEY_REJECTED"**
 - Anon keys are not accepted for MCP authentication

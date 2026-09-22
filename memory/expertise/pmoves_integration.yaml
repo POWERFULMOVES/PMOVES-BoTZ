@@ -278,7 +278,7 @@ env_templates:
       - TENSORZERO_BASE_URL
       - NATS_URL
       - SUPABASE_URL
-      - SUPABASE_JWT_SECRET
+      - JWT_SECRET
     optional:
       - HIRAG_URL
       - QDRANT_URL

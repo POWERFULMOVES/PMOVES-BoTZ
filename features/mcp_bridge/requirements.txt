@@ -1,8 +1,8 @@
 # PMOVES MCP Bridge dependencies
 httpx==0.26.0
 nats-py==2.7.0
-aiohttp==3.13.3
-python-jose[cryptography]==3.3.0  # JWT validation for MCP auth
+aiohttp==3.13.4
+python-jose[cryptography]==3.4.0  # JWT validation for MCP auth
 
 # Prometheus metrics
 prometheus-client==0.20.0

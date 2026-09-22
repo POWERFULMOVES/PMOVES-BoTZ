@@ -34,7 +34,10 @@ from .types import TaskState
 logger = logging.getLogger(__name__)
 
 JWT_ALGORITHM = os.environ.get("JWT_ALGORITHM", "HS256")
-SUPABASE_JWT_SECRET = os.environ.get("SUPABASE_JWT_SECRET", "").strip()
+# Fleet convention (pmoves/env.shared): SUPABASE_JWT_SECRET is primary,
+# JWT_SECRET is the accepted legacy fallback.
+SUPABASE_JWT_SECRET = (os.environ.get("SUPABASE_JWT_SECRET", "").strip()
+                       or os.environ.get("JWT_SECRET", "").strip())
 
 try:
     from jose import jwt as jose_jwt

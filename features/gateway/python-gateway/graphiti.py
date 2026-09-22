@@ -49,6 +49,7 @@ async def emit_graphiti_signature(
     Returns:
         True if event was published successfully.
     """
+    nc = None
     try:
         import nats as nats_pkg
 
@@ -73,12 +74,17 @@ async def emit_graphiti_signature(
         }
 
         await nc.publish(GRAPHITI_SUBJECT, json.dumps(payload).encode())
-        await nc.close()
         logger.info("Emitted graphiti signature: %s", summary)
         return True
     except Exception as e:
         logger.warning("Failed to emit graphiti event: %s", e)
         return False
+    finally:
+        try:
+            if nc and nc.is_connected:
+                await nc.close()
+        except Exception:
+            pass
 
 
 def emit_tool_call_trail(tool_name: str, agent_id: str, success: bool) -> None:
