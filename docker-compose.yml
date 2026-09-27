@@ -74,7 +74,12 @@ services:
       TENSORZERO_URL: ${TENSORZERO_URL:-http://host.docker.internal:3030}
       HIRAG_URL: ${HIRAG_URL:-http://host.docker.internal:8086}
       SUPASERCH_URL: ${SUPASERCH_URL:-http://host.docker.internal:8099}
-      NATS_URL: ${NATS_URL:-nats://nats:pmoves@host.docker.internal:4222}
+      # NATS by SERVICE NAME on the bus network (pmoves_bus below). A separate
+      # knob, deliberately: the fleet tier envs carry NATS_URL=localhost:4222
+      # for HOST-side tooling, and `localhost` inside a container is not the
+      # host -- feeding that value through made the NATS probe fail forever
+      # while the broker was healthy.
+      NATS_URL: ${MCP_BRIDGE_NATS_URL:-nats://nats:pmoves@nats:4222}
       SUPABASE_URL: ${SUPABASE_URL:-http://host.docker.internal:3010}
       SUPABASE_ANON_KEY: ${SUPABASE_ANON_KEY:-}
       SUPABASE_SERVICE_KEY: ${SUPABASE_SERVICE_KEY:-}
@@ -84,8 +89,16 @@ services:
       - "${MCP_BRIDGE_PORT:-8100}:8100"
     networks:
       - pmoves_app
+      - pmoves_bus
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8100/healthz', timeout=5)"]
+      # Reads the RESPONSE BODY, not just the status line. /healthz answers 200
+      # with {"status": "degraded", ...} when an integration probe fails, so a
+      # bare urlopen() -- which only checks that the request did not raise --
+      # reported this container healthy for 5 days while it was self-reporting
+      # degraded ("Integration health check failed: attempted relative import
+      # with no known parent package"). A health check that cannot observe the
+      # health field is not a health check.
+      test: ["CMD", "python", "-c", "import json,sys,urllib.request; d=json.load(urllib.request.urlopen('http://localhost:8100/healthz', timeout=5)); sys.exit(0 if d.get('status') in ('ok','healthy') else 1)"]
       interval: 30s
       timeout: 5s
       retries: 3
@@ -303,6 +316,11 @@ networks:
     name: pmoves_pmoves_app
     # If external network doesn't exist, create it first:
     # docker network create pmoves_pmoves_app --driver bridge
+  pmoves_bus:
+    external: true
+    name: pmoves_bus
+    # The message-bus network, so mcp-bridge reaches the NATS broker by
+    # service name for its integration health probe (and its nats tools).
 
 volumes:
   cipher-data:
