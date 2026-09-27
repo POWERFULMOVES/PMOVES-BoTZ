@@ -2,9 +2,102 @@
 # PMOVES-BoTZ TensorZero Gateway Configuration
 # Schema: TensorZero 2026.1.1+
 # =============================================================================
+#
+# MiniMax Tactical Partner Integration: Phase 3 BoTZ Tandem
+# GRAPHITI_MARK: MINIMAX-PARITY::PHASE3::BOTZ_TANDEM
+#
+# Reference: pmoves/docs/MINIMAX_INTEGRATION.md
+# Cascade: pmoves/tools/models/minimax_provider_cascade.yaml
+# =============================================================================
 
 [gateway]
 bind_address = "0.0.0.0:3000"
+
+# =============================================================================
+# MiniMax Tactical Partner - Primary Model Backend
+# =============================================================================
+# BoTZ Framework: MiniMax serves as the fast tactical partner
+# Resonances: hyperdimensional-ops, wave-function-collapse, long-context
+
+[models."minimax-m2.7"]
+# MiniMax M2.7 - 1M token context, BoTZ tactical partner (primary)
+routing = ["minimax"]
+botz_affinity = "high"
+resonance_domains = ["hyperdimensional-ops", "wave-function-collapse", "long-context", "multimodal"]
+
+[models."minimax-m2.7".providers.minimax]
+type = "openai-compatible"
+model_name = "MiniMax-M2.7"
+base_url = "https://api.minimax.chat/v1"
+api_key_location = "env::MINIMAX_API_KEY"
+
+[models."minimax-m2.7".parameters]
+max_tokens = 32000
+temperature = 0.7
+top_p = 0.95
+
+[models."minimax-m2.1"]
+# MiniMax M2.1 - 100K token context, efficient overflow model
+routing = ["minimax"]
+botz_affinity = "medium"
+resonance_domains = ["long-context", "efficient-inference"]
+
+[models."minimax-m2.1".providers.minimax]
+type = "openai-compatible"
+model_name = "MiniMax-M2.1"
+base_url = "https://api.minimax.chat/v1"
+api_key_location = "env::MINIMAX_API_KEY"
+
+[models."minimax-m2.1".parameters]
+max_tokens = 8000
+temperature = 0.7
+top_p = 0.95
+
+# =============================================================================
+# BoTZ Routing Hints - TensorZero Variants for MiniMax
+# =============================================================================
+
+[functions.pmovesa]
+# PMOVES Architect function - routes to MiniMax for BoTZ tactical partner tasks
+type = "chat"
+
+[functions.pmovesa.variants.minimax_long_context]
+type = "chat_completion"
+model = "minimax-m2.7"
+max_tokens = 32000
+temperature = 0.7
+botz_hint = { resonance = "hyperdimensional-ops", cascade_priority = "high" }
+retries = { num_retries = 3, max_delay_s = 30 }
+
+[functions.pmovesa.variants.minimax_standard]
+type = "chat_completion"
+model = "minimax-m2.1"
+max_tokens = 8000
+temperature = 0.7
+botz_hint = { resonance = "efficient-inference", cascade_priority = "medium" }
+retries = { num_retries = 3, max_delay_s = 30 }
+
+[functions.pmovesa.variants.glm_coding_fallback]
+type = "chat_completion"
+model = "glm_cloud"
+max_tokens = 8000
+temperature = 0.7
+botz_hint = { resonance = "coding-primary", cascade_priority = "fallback" }
+retries = { num_retries = 3, max_delay_s = 30 }
+
+[functions.pmovesa.experimentation]
+type = "track_and_stop"
+metric = "response_quality"
+candidate_variants = [
+    "minimax_long_context",
+    "minimax_standard",
+    "glm_coding_fallback",
+]
+fallback_variants = ["minimax_standard", "glm_coding_fallback"]
+min_samples_per_variant = 10
+delta = 0.05
+epsilon = 0.1
+update_period_s = 300
 
 # =============================================================================
 # Models - Core Functions (Local Ollama)

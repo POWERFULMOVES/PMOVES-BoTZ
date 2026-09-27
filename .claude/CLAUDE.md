@@ -1,6 +1,18 @@
 # PMOVES-BoTZ Developer Context
 
-**Always-on context for Claude Code CLI when working in the PMOVES-BoTZ repository.**
+> **🗄️ Archived 2026-04-19.** PMOVES-BoTZ is no longer active in the production mesh.
+>
+> - **Successor:** the BoTZ "expanded senses" architecture (12 senses, signal/noise via CHIT contracts) lives in `pmoves/services/` plus the skills constellation under `skills/`. See parent memory `project_botz_glances_architecture.md`.
+> - **Per-feature replacements:**
+>   - Document processing → `pmoves/services/extract-worker/` + `pmoves/services/ffmpeg-whisper/`
+>   - Memory/reasoning → `pmoves-cipher` (parent submodule), Cipher MCP SSE at `:8105`
+>   - Vision/Language → `pmoves/services/vl-sentinel/` (when present)
+>   - Workflow automation → n8n service in parent + `/n8n:*` skills
+> - **When to read this file:** only if you're cleaning up a stale BoTZ reference, salvaging a useful artifact, or doing the BoTZ archive forensic (see parent `pmoves/docs/audit/`).
+>
+> Do not build new features against this codebase. Direct new work to the parent `pmoves/services/` tree.
+
+**Historical context follows.** Always-on context for Claude Code CLI when working in the PMOVES-BoTZ repository.
 
 ## Architecture Overview
 

@@ -27,6 +27,7 @@ PMOVES-BoTZ Unified Agent Gateway - A multi-capability agent providing:
 - API testing automation (Postman)
 - Workflow automation (n8n)
 - Infrastructure management (Hostinger)
+- Discord channel reading and message retrieval
 
 Part of the PMOVES.AI agentic ecosystem.
 """
@@ -64,6 +65,10 @@ def build_capabilities_from_upstream(upstream_servers: Dict[str, Dict]) -> List[
         "postman": AgentCapability(
             name="api_testing",
             description="Execute API collections and manage request automation"
+        ),
+        "discord": AgentCapability(
+            name="discord_channel_reader",
+            description="Read and search Discord channel message history"
         ),
     }
 
