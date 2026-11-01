@@ -245,7 +245,7 @@ class CommonServices:
     MINIO = "http://minio:9000"
 
     # NATS
-    NATS = "nats://nats:pmoves@nats:4222"
+    NATS = ""
 
     @classmethod
     def get(cls, service: str) -> str:

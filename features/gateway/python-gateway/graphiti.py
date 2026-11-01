@@ -17,7 +17,7 @@ from typing import Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 
-NATS_URL = os.getenv("NATS_URL", "nats://nats:pmoves@nats:4222")
+NATS_URL = os.getenv("NATS_URL", "")
 GRAPHITI_SUBJECT = "agent.graphiti.signed.v1"
 
 # BoTZ Gateway identity (matches pmoves/config/agent_signatures.yaml)
